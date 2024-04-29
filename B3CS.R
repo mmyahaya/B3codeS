@@ -74,6 +74,36 @@ plot(taxa.sf[1], add=TRUE) #add occurence points
 
 uN<-unique(taxa.sf$species)
 
+##### TRY data ####
+
+
+input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
+# import data
+tryFULL.df<-rtry_import(
+  input=input_path,
+  separator = "\t",
+  encoding = "Latin-1",
+  quote = "",
+  showOverview = TRUE
+)
+
+uN.df<-as.data.frame(uN)
+
+TRYcat <- readxl::read_excel("TRYcat.xlsx", sheet = 1)
+# create data of species with traits
+CATtrait.df<-inner_join(uN.df,TRYcat[,1:22],
+                        by=join_by("uN"=="AccSpeciesName"))
+
+##### Junks ####
+taxa.df %>%
+  drop_na(species) %>%
+  count(species, sort = TRUE) %>%
+  filter(n>3)
+
+summary(CATtrait.df)
+
+CATtrait.df<- CATtrait.df %>%
+  mutate(decade=ifelse(dateIdentified>as.Date("2024-02-28"),"First","Second"))
 
 
 dataGEN = function(arg1,TaxaName..){
@@ -94,29 +124,4 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
-library(sf)
 
-# Define the bounding box coordinates
-bbox <- st_bbox(rsa_ext, crs = 4326)
-
-# Create a grid with 1 km x 1 km cells
-grid <- st_make_grid(bbox, cellsize = c(.020, .020),n=20, what = "polygons")
-
-# Plot the grid
-plot(grid)
-
-
-lonlat<-cbind(taxa.occ$decimalLongitude,taxa.occ$decimalLatitude)
-
-pts<-vect(lonlat)
-pts <- vect(lonlat, crs="+proj=longlat +datum=WGS84")
-rsa_ext = extent(16, 33, -35, -22)
-
-
-plot(st_make_grid(what = "polygons"), axes = TRUE)
-plot(st_make_grid(what = "corners"), add = TRUE, col = 'green', pch=3)
-sfc = st_sfc(st_polygon(list(rbind(c(0,0), c(1,0), c(1,1), c(0,0)))))
-plot(st_make_grid(sfc, cellsize = .1, square = FALSE))
-points(pts, add = TRUE)
-st_make_grid(what = "centers")
-grid
