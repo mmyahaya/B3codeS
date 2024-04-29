@@ -6,36 +6,40 @@ library(tidyverse)
 library(rgbif) # for occ_download
 library(terra)
 library(sf)
-
+library(rtry) # for processing try data
+library(rasterVis)
 ##### gbif data ####
 taxa = 'Tracheophyta' # scientific name
 
-gbif_download = occ_data(scientificName=taxa,
+gbif_download = occ_data(scientificName=taxa, # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
                          limit = 2000)
 
-taxa.df = as.data.frame(gbif_download$data)
+taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
 
 
 taxa.occ = taxa.df %>%
-  dplyr::select(key,decimalLatitude,decimalLongitude,occurrenceStatus,genus,
-                species,genericName,dateIdentified) %>%
-  filter_all(all_vars(!is.na(.))) %>%
-  mutate(dateIdentified = as.Date(dateIdentified))
+  dplyr::select(key,decimalLatitude,decimalLongitude,
+                species,dateIdentified) %>% #select occurrence data
+  filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+  mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
 
-taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
-
+taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
+                  crs = 4326) # convert long and lat point to geometry
+taxa.sf$count=1
 # Define a grid over spatial extend
-grid<- st_make_grid(
-  taxa.sf,
-  square = TRUE,
-  cellsize = c(0.2, 0.2)
-)
-# create intersect
-intersected <- st_intersection(grid, taxa.sf)
+gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326")
 
+countQDS = rasterize(taxa.sf,
+                     gridQDS,
+                     field='count',
+                     fun=sum,
+                     background = 0)
+
+
+levelplot(countQDS) # improve plots
 plot(grid)
 plot(taxa.sf[1], add=TRUE)
 ##### TRY data ####
@@ -65,13 +69,12 @@ taxa.df %>%
 
 
 
+plot(countQDS)# plot grid cell
+plot(taxa.sf[1], add=TRUE) #add occurence points
 
-rsa_ext = extent(16, 33, -35, -22)
+uN<-unique(taxa.sf$species)
 
-# head(lepidop.df)
 
-lepidop.sf = st_as_sf(lepidop.df, coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
-plot(lepidop.sf['stateProvince'])
 
 dataGEN = function(arg1,TaxaName..){
 
