@@ -39,8 +39,8 @@ countQDS = rasterize(taxa.sf,
                      background = 0)
 
 
-levelplot(countQDS) # improve plots
-plot(grid)
+rasterVis::levelplot(countQDS)->countPlot # improve plots
+plot(countQDS)
 plot(taxa.sf[1], add=TRUE)
 ##### TRY data ####
 library(rtry)
@@ -61,12 +61,15 @@ tryFULL.df<-rtry_import(input_path,
 
 
 ##### Junks ####
-taxa.df %>%
+taxa.sf %>%
   drop_na(species) %>%
   count(species, sort = TRUE) %>%
-  filter(n>3)
+  nrow()
 
-
+taxa.sf %>%
+  filter(species=="Vachellia karroo") %>%
+  count(dateIdentified) %>%
+  nrow()
 
 
 plot(countQDS)# plot grid cell
