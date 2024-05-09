@@ -50,7 +50,7 @@ library(rtry)
 path_to_data <- system.file("testdata", "data_TRY_15160.txt", package = "rtry")
 path_to_data
 
-TRYdata1 <- rtry_import(path_to_data)
+data_TRY_15160 <- rtry_import(path_to_data)
 input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space"
 
 tryFULL.df<-rtry_import(input_path,
@@ -94,19 +94,19 @@ tTable<- table_traits %>%
   filter(ObsNum>10000)
 
 
-speciesID<-CATtrait.df$AccSpeciesID
+speciesID<-as.numeric(speciesID$AccSpeciesID)
 traitID<-as.numeric(tTable$TraitID)
 
 # print in TRY input format
-dput(specieID)
+dput(speciesID)
 dput(traitID)
 
 
 
 input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
 # import data
-tryFULL.df<-rtry_import(
-  input=input_path,
+try33576.df<-rtry_import(
+  input="C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt",
   separator = "\t",
   encoding = "Latin-1",
   quote = "",
@@ -114,6 +114,14 @@ tryFULL.df<-rtry_import(
 )
 
 
+try1<-try33576.df %>%
+  drop_na(TraitID) %>%
+  select(AccSpeciesID,AccSpeciesName,TraitID,TraitName,OriglName,OrigValueStr,
+         OrigUnitStr) %>%
+  group_by(AccSpeciesName,TraitName) %>%
+  summarise(across(c(AccSpeciesID,TraitID,
+                     OriglName,OrigValueStr,
+                     OrigUnitStr), first))
 
 ##### Junks ####
 taxa.df %>%
