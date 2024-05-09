@@ -42,6 +42,8 @@ countQDS = rasterize(taxa.sf,
 rasterVis::levelplot(countQDS)->countPlot # improve plots
 plot(countQDS)
 plot(taxa.sf[1], add=TRUE)
+
+
 ##### TRY data ####
 library(rtry)
 
@@ -75,9 +77,30 @@ taxa.sf %>%
 plot(countQDS)# plot grid cell
 plot(taxa.sf[1], add=TRUE) #add occurence points
 
-uN<-unique(taxa.sf$species)
+
 
 ##### TRY data ####
+uniqueName<-data.frame("uN"=unique(taxa.sf$species))
+
+#TRYcat <- readxl::read_excel("TRYcat.xlsx", sheet = 1)
+# create data of species with traits
+speciesID<-inner_join(uniqueName,TryAccSpecies,
+                        by=join_by("uN"=="AccSpeciesName")) %>%
+  select(AccSpeciesID)
+
+
+# get traits with more than 10000 observations
+tTable<- table_traits %>%
+  filter(ObsNum>10000)
+
+
+speciesID<-CATtrait.df$AccSpeciesID
+traitID<-as.numeric(tTable$TraitID)
+
+# print in TRY input format
+dput(specieID)
+dput(traitID)
+
 
 
 input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
@@ -90,12 +113,7 @@ tryFULL.df<-rtry_import(
   showOverview = TRUE
 )
 
-uN.df<-as.data.frame(uN)
 
-TRYcat <- readxl::read_excel("TRYcat.xlsx", sheet = 1)
-# create data of species with traits
-CATtrait.df<-inner_join(uN.df,TRYcat[,1:22],
-                        by=join_by("uN"=="AccSpeciesName"))
 
 ##### Junks ####
 taxa.df %>%
