@@ -115,13 +115,21 @@ try33576.df<-rtry_import(
 
 
 try1<-try33576.df %>%
+  # drop rows which contains no trait
   drop_na(TraitID) %>%
-  select(AccSpeciesID,AccSpeciesName,TraitID,TraitName,OriglName,OrigValueStr,
-         OrigUnitStr) %>%
-  group_by(AccSpeciesName,TraitName) %>%
-  summarise(across(c(AccSpeciesID,TraitID,
-                     OriglName,OrigValueStr,
-                     OrigUnitStr), first))
+  # select species name, trait and trait value
+  select(AccSpeciesName,TraitID,OrigValueStr) %>%
+  #group by Species and trait
+  group_by(AccSpeciesName,TraitID) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(OrigValueStr, first), .groups = "drop") %>%
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = TraitID, values_from = OrigValueStr)
+
+
+
+
+
 
 ##### Junks ####
 taxa.df %>%
@@ -134,6 +142,10 @@ summary(CATtrait.df)
 CATtrait.df<- CATtrait.df %>%
   mutate(decade=ifelse(dateIdentified>as.Date("2024-02-28"),"First","Second"))
 
+try33576.df %>%
+  dplyr::group_by(AccSpeciesName, TraitID) %>%
+  dplyr::summarise(n = dplyr::n(), .groups = "drop") %>%
+  dplyr::filter(n > 1L)
 
 dataGEN = function(arg1,TaxaName..){
 
