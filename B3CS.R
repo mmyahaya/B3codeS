@@ -66,7 +66,7 @@ tryFULL.df<-rtry_import(input_path,
 taxa.sf %>%
   drop_na(species) %>%
   count(species, sort = TRUE) %>%
-  nrow()
+  filter(n>10)
 
 taxa.sf %>%
   filter(species=="Vachellia karroo") %>%
@@ -165,4 +165,11 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
+# Create a raster with dimensions 4x3x1
+r <- rast(nrows=4, ncols=3, nlyrs=2)
 
+# Assign unique IDs to each cell
+r$lyr.1 <- 1:ncell(r)
+
+# Print the raster to see the unique IDs
+print(r)
