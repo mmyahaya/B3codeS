@@ -21,7 +21,7 @@ taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded fi
 
 
 taxa.occ = taxa.df %>%
-  dplyr::select(key,decimalLatitude,decimalLongitude,
+  dplyr::select(speciesKey,decimalLatitude,decimalLongitude,
                 species,dateIdentified) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
@@ -166,10 +166,42 @@ dataGEN = function(arg1,TaxaName..){
 
 
 # Create a raster with dimensions 4x3x1
-r <- rast(nrows=4, ncols=3, nlyrs=2)
-
+r <- rast(ext(taxa.sf),nrows=4, ncols=3, nlyrs=3)
+gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
+names(gridQDS)<-c("ID",uN)
+gridQDS["ID"]<-1:3050
+ncell(gridQDS)
+gridQDS
 # Assign unique IDs to each cell
-r$lyr.1 <- 1:ncell(r)
+names(r)<- c("ID","sp1","sp2")
+r$ID <- 1:ncell(r)
+r$sp1<-data.frame(rfield)
+r$sp2<-rbinom(12,1,0.3)
+names(gridQDS)[1:10]
 
+r[]
 # Print the raster to see the unique IDs
 print(r)
+plot(r$sp1)
+plot(sp1, add=T)
+# Get coordinates of each cell
+coords <- xyFromCell(r, 1:12)
+
+# Print the coordinates
+print(coords)
+data.frame(r)
+
+
+rfield = rasterize(st_as_sf(sp1[1:4]),
+                     r,
+                     field=1,
+                     fun="max",
+                     background = 0)
+
+data.frame(rfield)
+plot(rfield)
+plot(sp1, add=T)
+
+sp1<-taxa.sf$geometry[1:12]
+sp2<-taxa.sf$geometry[101:112]
+uN<-unique(taxa.sf$species)
