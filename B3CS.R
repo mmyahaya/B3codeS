@@ -44,6 +44,77 @@ plot(countQDS)
 plot(taxa.sf[1], add=TRUE)
 
 
+#### Site by Species #####
+# extract unique species name from GBIF occurrence data
+uN<-unique(taxa.sf$species)
+# Create grid cells with extent of the data and layers for siteID and species
+gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
+# specify name for each layers of site ID and individual species
+names(gridQDS)<-c("siteID",uN)
+# Assign ID for each cell
+gridQDS[["siteID"]]<-1:ncell(gridQDS)
+# create layer for species occurrence in each cell 
+for(n in uN){
+  # create raster of species
+  speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
+                         gridQDS,
+                         field=1,
+                         fun="max",
+                         background = 0)
+  # insert occurrence layer for each species to it assigned layer
+  gridQDS[[n]] <- speciesQDS[]
+}
+# create data frame of site by species
+as.data.frame(gridQDS[])->SitebySpecies
+
+##### Specie by trait  ####
+uniqueName<-data.frame("uN"=uN)
+
+# create data of species with traits
+speciesID<-inner_join(uniqueName,TryAccSpecies,
+                      by=join_by("uN"=="AccSpeciesName")) %>%
+  select(AccSpeciesID)
+
+
+# get traits with more than 10000 observations
+tTable<- table_traits %>%
+  filter(ObsNum>10000)
+# create specieID and traitID for request from TRY database
+speciesID<-as.numeric(speciesID$AccSpeciesID)
+traitID<-as.numeric(tTable$TraitID)
+
+# print in TRY input format
+dput(speciesID)
+dput(traitID)
+
+
+
+input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
+# import data
+try33576<-rtry_import(
+  input=input_path,
+  separator = "\t",
+  encoding = "Latin-1",
+  quote = "",
+  showOverview = TRUE
+)
+
+
+try1<-try33576 %>%
+  # drop rows which contains no trait
+  drop_na(TraitID) %>%
+  # select species name, trait and trait value
+  select(AccSpeciesName,TraitID,OrigValueStr) %>%
+  #group by Species and trait
+  group_by(AccSpeciesName,TraitID) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(OrigValueStr, first), .groups = "drop") %>%
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = TraitID, values_from = OrigValueStr)
+
+
+
+
 ##### TRY data ####
 library(rtry)
 
@@ -68,63 +139,12 @@ taxa.sf %>%
   count(species, sort = TRUE) %>%
   filter(n>10)
 
-taxa.sf %>%
-  filter(species=="Vachellia karroo") %>%
-  count(dateIdentified) %>%
-  nrow()
+
 
 
 plot(countQDS)# plot grid cell
-plot(taxa.sf[1], add=TRUE) #add occurence points
+plot(taxa.sf[1], add=TRUE) #add occurrence points
 
-
-
-##### TRY data ####
-uniqueName<-data.frame("uN"=unique(taxa.sf$species))
-
-#TRYcat <- readxl::read_excel("TRYcat.xlsx", sheet = 1)
-# create data of species with traits
-speciesID<-inner_join(uniqueName,TryAccSpecies,
-                        by=join_by("uN"=="AccSpeciesName")) %>%
-  select(AccSpeciesID)
-
-
-# get traits with more than 10000 observations
-tTable<- table_traits %>%
-  filter(ObsNum>10000)
-
-
-speciesID<-as.numeric(speciesID$AccSpeciesID)
-traitID<-as.numeric(tTable$TraitID)
-
-# print in TRY input format
-dput(speciesID)
-dput(traitID)
-
-
-
-input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
-# import data
-try33576.df<-rtry_import(
-  input="C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt",
-  separator = "\t",
-  encoding = "Latin-1",
-  quote = "",
-  showOverview = TRUE
-)
-
-
-try1<-try33576.df %>%
-  # drop rows which contains no trait
-  drop_na(TraitID) %>%
-  # select species name, trait and trait value
-  select(AccSpeciesName,TraitID,OrigValueStr) %>%
-  #group by Species and trait
-  group_by(AccSpeciesName,TraitID) %>%
-  #choose the first trait value if there are multiples trait for a species
-  summarise(across(OrigValueStr, first), .groups = "drop") %>%
-  # reshape to wide format to have specie by trait dataframe
-  pivot_wider(names_from = TraitID, values_from = OrigValueStr)
 
 
 
@@ -165,13 +185,12 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
-# Create a raster with dimensions 4x3x1
-r <- rast(ext(taxa.sf),nrows=4, ncols=3, nlyrs=3)
-gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
-names(gridQDS)<-c("ID",uN)
-gridQDS["ID"]<-1:3050
-ncell(gridQDS)
+
 gridQDS
+plot(gridQDS[[uN[90:93]]])
+
+
+r <- rast(ext(taxa.sf),nrows=4, ncols=3, nlyrs=3)
 # Assign unique IDs to each cell
 names(r)<- c("ID","sp1","sp2")
 r$ID <- 1:ncell(r)
@@ -192,7 +211,7 @@ print(coords)
 data.frame(r)
 
 
-rfield = rasterize(st_as_sf(sp1[1:4]),
+rfield = rasterize(dplyr::filter(taxa.sf, species==uN[67]),
                      r,
                      field=1,
                      fun="max",
@@ -200,8 +219,15 @@ rfield = rasterize(st_as_sf(sp1[1:4]),
 
 data.frame(rfield)
 plot(rfield)
-plot(sp1, add=T)
+plot(dplyr::filter(taxa.sf, species==uN[67]), add=T)
 
 sp1<-taxa.sf$geometry[1:12]
 sp2<-taxa.sf$geometry[101:112]
-uN<-unique(taxa.sf$species)
+
+taxa.sf %>%
+  group_by(species) %>% 
+  filter(species=="Clerodendrum ternatum") #%>%
+  #count(species)
+taxa.sf[,2]
+dplyr::filter(taxa.sf, species==uN[67])
+sum(speciesQDS[])
