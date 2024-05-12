@@ -53,7 +53,7 @@ gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1
 names(gridQDS)<-c("siteID",uN)
 # Assign ID for each cell
 gridQDS[["siteID"]]<-1:ncell(gridQDS)
-# create layer for species occurrence in each cell 
+# create layer for species occurrence in each cell
 system.time(for(n in uN){
   # create raster of species
   speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
@@ -91,8 +91,7 @@ dput(traitID)
 
 
 input_path<- "C:/Users/mukht/Downloads/33576.txt"
-  #"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
-# import data
+#"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
 try33576<-rtry_import(
   input=input_path,
   separator = "\t",
@@ -116,14 +115,30 @@ SpeciesbyTrait<-try33576 %>%
 
 
 
-
-ID = StringJoin('Long','Lat','Time')
-
-lon <- taxa.occ$decimalLongitude
-lat <- taxa.occ$decimalLatitude
-Time <- taxa.occ$dateIdentified
+#### Species by xyt ####
+# ID = StringJoin('Long','Lat','Time')
+# create longitude, latitude and time vectors
+lon <- taxa.occ$decimalLongitude # x
+lat <- taxa.occ$decimalLatitude # y
+Time <- taxa.occ$dateIdentified # t
+# concatenate longitude, latitude and time
 xyt <- paste(lon, lat, Time, sep = ",")
-taxa.sf$xyt<-xyt
+# bind xyt to occurrence dataframe
+taxa.occ$xyt<-xyt
+# create value for presence count
+taxa.occ$count <- 1
+
+Speciesbyxyt <- taxa.occ %>%
+  select(species,count,xyt) %>%
+  #group by Species and xyt
+  group_by(species,xyt) %>%
+  # count and add species occurrence in each xyt
+  summarise(across(count, sum), .groups = "drop") %>%
+  # reshape to wide format to have specie by xyt dataframe
+  pivot_wider(names_from = xyt, values_from = count)
+
+
+
 ##### TRY data ####
 library(rtry)
 
@@ -234,9 +249,21 @@ sp1<-taxa.sf$geometry[1:12]
 sp2<-taxa.sf$geometry[101:112]
 
 taxa.sf %>%
-  group_by(species) %>% 
+  group_by(species) %>%
   filter(species=="Clerodendrum ternatum") #%>%
   #count(species)
 taxa.sf[,2]
 dplyr::filter(taxa.sf, species==uN[67])
 sum(speciesQDS[])
+
+
+chelsaA18 <- terra::rast('CHELSA_swb_2018_V.2.1.tif')
+plot(chelsaA18)
+chelsa.SA<-crop(chelsaA18,ext(taxa.sf))
+plot(chelsa.SA)
+chelsa.SA[]
+envSA<-rasterize(chelsa.SA,
+                 gridQDS,
+                 field=1,
+                 fun=mean,
+                 background = 0)
