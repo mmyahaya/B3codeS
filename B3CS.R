@@ -54,7 +54,7 @@ names(gridQDS)<-c("siteID",uN)
 # Assign ID for each cell
 gridQDS[["siteID"]]<-1:ncell(gridQDS)
 # create layer for species occurrence in each cell 
-for(n in uN){
+system.time(for(n in uN){
   # create raster of species
   speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
                          gridQDS,
@@ -63,14 +63,15 @@ for(n in uN){
                          background = 0)
   # insert occurrence layer for each species to it assigned layer
   gridQDS[[n]] <- speciesQDS[]
-}
+})
+
 # create data frame of site by species
-as.data.frame(gridQDS[])->SitebySpecies
+SitebySpecies <- as.data.frame(gridQDS[])
 
 ##### Specie by trait  ####
 uniqueName<-data.frame("uN"=uN)
 
-# create data of species with traits
+# get TRY species ID for data from GBIF
 speciesID<-inner_join(uniqueName,TryAccSpecies,
                       by=join_by("uN"=="AccSpeciesName")) %>%
   select(AccSpeciesID)
@@ -89,7 +90,8 @@ dput(traitID)
 
 
 
-input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
+input_path<- "C:/Users/mukht/Downloads/33576.txt"
+  #"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space//33312.txt"
 # import data
 try33576<-rtry_import(
   input=input_path,
@@ -100,7 +102,7 @@ try33576<-rtry_import(
 )
 
 
-try1<-try33576 %>%
+SpeciesbyTrait<-try33576 %>%
   # drop rows which contains no trait
   drop_na(TraitID) %>%
   # select species name, trait and trait value
@@ -115,6 +117,13 @@ try1<-try33576 %>%
 
 
 
+ID = StringJoin('Long','Lat','Time')
+
+lon <- taxa.occ$decimalLongitude
+lat <- taxa.occ$decimalLatitude
+Time <- taxa.occ$dateIdentified
+xyt <- paste(lon, lat, Time, sep = ",")
+taxa.sf$xyt<-xyt
 ##### TRY data ####
 library(rtry)
 
