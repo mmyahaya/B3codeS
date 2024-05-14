@@ -28,20 +28,6 @@ taxa.occ = taxa.df %>%
 
 taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
                   crs = 4326) # convert long and lat point to geometry
-taxa.sf$count=1
-# Define a grid over spatial extend
-gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326")
-
-countQDS = rasterize(taxa.sf,
-                     gridQDS,
-                     field='count',
-                     fun=sum,
-                     background = 0)
-
-
-rasterVis::levelplot(countQDS)->countPlot # improve plots
-plot(countQDS)
-plot(taxa.sf[1], add=TRUE)
 
 
 #### Site by Species #####
@@ -64,14 +50,17 @@ system.time(for(n in uN){
   # insert occurrence layer for each species to it assigned layer
   gridQDS[[n]] <- speciesQDS[]
 })
-
+speciesQDS
+gridQDS[['siteID']]
 # create data frame of site by species
 SitebySpecies <- as.data.frame(gridQDS[])
 
-##### Specie by trait  ####
+
+##### Specie by trait  #####
+# Make the rows
 uniqueName<-data.frame("uN"=uN)
 
-# get TRY species ID for data from GBIF
+# get TRY species ID for gbif species data
 speciesID<-inner_join(uniqueName,TryAccSpecies,
                       by=join_by("uN"=="AccSpeciesName")) %>%
   select(AccSpeciesID)
@@ -90,8 +79,8 @@ dput(traitID)
 
 
 
-input_path<- "C:/Users/mukht/Downloads/33576.txt"
-#"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
+input_path<- "C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
+# "C:/Users/mukht/Downloads/33576.txt"
 try33576<-rtry_import(
   input=input_path,
   separator = "\t",
@@ -138,6 +127,27 @@ Speciesbyxyt <- taxa.occ %>%
   pivot_wider(names_from = xyt, values_from = count)
 
 
+
+#####
+taxa.sf$count=1
+# Define a grid over spatial extend
+gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326")
+
+countQDS = rasterize(taxa.sf,
+                     gridQDS,
+                     field='count',
+                     fun=sum,
+                     background = 0)
+
+
+rasterVis::levelplot(countQDS)->countPlot # improve plots
+plot(countQDS)
+plot(taxa.sf[1], add=TRUE)
+
+
+uN[7]
+plot(gridQDS[[uN[7]]])
+plot(filter(taxa.sf, species==uN[7]),add=TRUE)
 
 ##### TRY data ####
 library(rtry)
