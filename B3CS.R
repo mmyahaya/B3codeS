@@ -33,8 +33,12 @@ taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
 #### Site by Species #####
 # extract unique species name from GBIF occurrence data
 uN<-unique(taxa.sf$species)
+# Read RSA land area shapefile
+rsa_country_sf = st_read("C:/Users/mukht/OneDrive/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
+
+
 # Create grid cells with extent of the data and layers for siteID and species
-gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
+gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
 # specify name for each layers of site ID and individual species
 names(gridQDS)<-c("siteID",uN)
 # Assign ID for each cell
@@ -50,10 +54,13 @@ system.time(for(n in uN){
   # insert occurrence layer for each species to it assigned layer
   gridQDS[[n]] <- speciesQDS[]
 })
-speciesQDS
-gridQDS[['siteID']]
+# Make QDS Mask. Remember to mask the background to NA
+rsa_mask = rasterize(rsa_country_sf, gridQDS, background=NA)
+
+gridQDS_mask = mask(gridQDS, rsa_mask)
+
 # create data frame of site by species
-SitebySpecies <- as.data.frame(gridQDS[])
+SitebySpecies <- as.data.frame(gridQDS_mask[])
 
 
 ##### Specie by trait  #####
