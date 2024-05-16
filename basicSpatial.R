@@ -11,7 +11,7 @@ library(colorspace)
 library(RColorBrewer)
 
 # Read RSA land area shapefile
-(rsa_country_sf = st_read("C:/Users/mukht/OneDrive/Documents/boundary_SA/boundary_south_africa_land_geo.shp"))
+(rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp"))
 plot(rsa_country_sf['Land'])
 
 # Create a QDS raster
@@ -31,11 +31,14 @@ plot(dplyr::filter(taxa.sf, species==uN[4]),add=TRUE)
 random_pts = st_sample(rsa_country_sf, size=1000, type="random")    
 random_pts_sf = vect(random_pts)
 points(random_pts_sf, pch=20)
+#points(taxa.sf, pch=20)
 lines(rsa_country_sf['Land'])
 
 # Extract data to points
-qds_values = extract(gridQDS_mask, random_pts_sf, xy=TRUE, bind=TRUE)
-qds_values
+qds_values = terra::extract(gridQDS_mask, random_pts_sf, xy=TRUE, bind=TRUE)
+rsa_qds_values = terra::extract(rsaExt_bio_10m, taxa.sf, xy=TRUE, bind=TRUE)
+
+rsa_qds_values
 
 # Create an empty raster with finer scale than QDS
 # egEnv1 = rast(rsa_country_sf['Land'],res=c(0.0625,0.0625), crs='+init=epsg:4326')
@@ -64,7 +67,7 @@ plot(egEnv1$egBioP, main="Raster with Patches")
 lines(rsa_country_sf['Land'],lwd=3, col="blue")
 
 # Extract data to points (SpatVector)
-env1_values = extract(egEnv1, qds_values, bind=TRUE)
+env1_values = terra::extract(egEnv1, qds_values, bind=TRUE)
 env1_values
 points(env1_values, pch=20)
 
