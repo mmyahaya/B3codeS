@@ -25,7 +25,7 @@ plot(rsa_mask)
 
 # Mask the QDS raster to check it's working
 gridQDS_mask = mask(gridQDS, rsa_mask)
-plot(gridQDS[[uN[4]]])
+plot(gridQDS_mask[[uN[1:4]]])
 plot(dplyr::filter(taxa.sf, species==uN[4]),add=TRUE)
 # Create 100 random points across South Africa
 random_pts = st_sample(rsa_country_sf, size=1000, type="random")    
@@ -61,7 +61,7 @@ egEnv1$egBioP = rast(egEnv1$egBio, vals=habitat)
 
 # Plot the resulting raster with patches
 plot(egEnv1$egBioP, main="Raster with Patches")
-lines(rsa_country_sf['Land'])
+lines(rsa_country_sf['Land'],lwd=3, col="blue")
 
 # Extract data to points (SpatVector)
 env1_values = extract(egEnv1, qds_values, bind=TRUE)
