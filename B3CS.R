@@ -8,6 +8,7 @@ library(terra)
 library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
+library(lubridate)
 ##### gbif data ####
 taxa = 'Tracheophyta' # scientific name
 
@@ -34,7 +35,7 @@ taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
 # extract unique species name from GBIF occurrence data
 uN<-unique(taxa.sf$species)
 # Read RSA land area shapefile
-rsa_country_sf = st_read("C:/Users/mukht/OneDrive/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
+rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
 
 # Create grid cells with extent of the data and layers for siteID and species
@@ -62,6 +63,43 @@ gridQDS_mask = mask(gridQDS, rsa_mask)
 # create data frame of site by species
 SitebySpecies <- as.data.frame(gridQDS_mask[])
 
+##### speciebyxyt ####
+
+taxa.sf$day <- yday(taxa.sf$dateIdentified)
+taxa.sf <- taxa.sf %>% 
+  mutate(period = case_when(
+    day >= 1 & day <= 14 ~ 1,
+    day >= 15 & day <= 28 ~ 2,
+    day >= 29 & day <= 42 ~ 3,
+    day >= 43 & day <= 56 ~ 4,
+    day >= 57 & day <= 70 ~ 5,
+    day >= 71 & day <= 84 ~ 6,
+    day >= 85 & day <= 98 ~ 7,
+    day >= 99 & day <= 112 ~ 8,
+    day >= 113 & day <= 126 ~ 9,
+    TRUE ~ NA_integer_  # Default case, if any value falls outside the specified ranges
+  ))
+# create an empty list for species by xyt
+Speciesbyxyt <- list() 
+for (t in sort(unique(taxa.sf$period))) {
+  for(n in uN){
+    # create raster of species
+    speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==t),
+                           gridQDS,
+                           field=1,
+                           fun="max",
+                           background = 0)
+    # insert occurrence layer for each species to it assigned layer
+    gridQDS[[n]] <- speciesQDS[]
+  }
+  
+  # mask the site
+  gridQDS_mask.t = mask(gridQDS, rsa_mask)
+  
+  # create data frame of site by species
+  Speciesbyxyt[[paste0("P",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
+  
+}
 
 ##### Specie by trait  #####
 # Make the rows
@@ -86,8 +124,9 @@ dput(traitID)
 
 
 
-input_path<- "C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
-# "C:/Users/mukht/Downloads/33576.txt"
+input_path<-"C:/Users/mukht/Downloads/33576.txt"
+  #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
+# 
 try33576<-rtry_import(
   input=input_path,
   separator = "\t",
@@ -107,10 +146,17 @@ SpeciesbyTrait<-try33576 %>%
   #choose the first trait value if there are multiples trait for a species
   summarise(across(OrigValueStr, first), .groups = "drop") %>%
   # reshape to wide format to have specie by trait dataframe
-  pivot_wider(names_from = TraitID, values_from = OrigValueStr)
-
-
-
+  pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>% 
+  # select species that are only present in gbif data
+  filter(AccSpeciesName %in% uN) %>% 
+  # convert species names to row names
+  column_to_rownames(var = "AccSpeciesName") 
+# add the rows of the remaining species without traits from TRY
+{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
+                            ncol = ncol(SpeciesbyTrait)))
+row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
+names(na.df)<-names(SpeciesbyTrait)
+SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)}
 #### Species by xyt ####
 # ID = StringJoin('Long','Lat','Time')
 # create longitude, latitude and time vectors
@@ -284,3 +330,31 @@ envSA<-rasterize(chelsa.SA,
                  field=1,
                  fun=mean,
                  background = 0)
+
+
+juli<-data.frame("origDate"=taxa.occ$dateIdentified,
+                 "JuliDate"=julian(taxa.occ$dateIdentified))
+lubri<-data.frame("origDate"=taxa.occ$dateIdentified,
+                  "lubriDate"=yday(taxa.occ$dateIdentified))
+
+
+
+t=7
+system.time(for(n in uN){
+  # create raster of species
+  speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==7),
+                         gridQDS,
+                         field=1,
+                         fun="max",
+                         background = 0)
+  # insert occurrence layer for each species to it assigned layer
+  gridQDS[[n]] <- speciesQDS[]
+}
+)
+
+# mask the site
+gridQDS_mask.t = mask(gridQDS, rsa_mask)
+
+# create data frame of site by species
+Speciesbyxyt[[paste0("P",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
+
