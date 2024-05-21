@@ -9,14 +9,15 @@ library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
 library(lubridate)
+
 ##### gbif data ####
-taxa = 'Tracheophyta' # scientific name
+taxa = 'Acacia' # scientific name
 
 gbif_download = occ_data(scientificName=taxa, # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 2000)
+                         limit = 17726)
 
 taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
 
@@ -81,7 +82,7 @@ taxa.sf <- taxa.sf %>%
   ))
 # create an empty list for species by xyt
 Speciesbyxyt <- list() 
-for (t in sort(unique(taxa.sf$period))) {
+system.time(for (t in sort(unique(taxa.sf$period))) {
   for(n in uN){
     # create raster of species
     speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==t),
@@ -97,9 +98,10 @@ for (t in sort(unique(taxa.sf$period))) {
   gridQDS_mask.t = mask(gridQDS, rsa_mask)
   
   # create data frame of site by species
-  Speciesbyxyt[[paste0("P",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
+  Speciesbyxyt[[paste0("T",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
   
-}
+})
+
 
 ##### Specie by trait  #####
 # Make the rows
@@ -126,7 +128,7 @@ dput(traitID)
 
 input_path<-"C:/Users/mukht/Downloads/33576.txt"
   #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
-# 
+
 try33576<-rtry_import(
   input=input_path,
   separator = "\t",
@@ -155,30 +157,36 @@ SpeciesbyTrait<-try33576 %>%
 {na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
                             ncol = ncol(SpeciesbyTrait)))
 row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
-names(na.df)<-names(SpeciesbyTrait)
+names(na.df)<-names(SpeciesbyTrait) # column names
 SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)}
-#### Species by xyt ####
-# ID = StringJoin('Long','Lat','Time')
-# create longitude, latitude and time vectors
-lon <- taxa.occ$decimalLongitude # x
-lat <- taxa.occ$decimalLatitude # y
-Time <- taxa.occ$dateIdentified # t
-# concatenate longitude, latitude and time
-xyt <- paste(lon, lat, Time, sep = ",")
-# bind xyt to occurrence dataframe
-taxa.occ$xyt<-xyt
-# create value for presence count
-taxa.occ$count <- 1
 
-Speciesbyxyt <- taxa.occ %>%
-  select(species,count,xyt) %>%
-  #group by Species and xyt
-  group_by(species,xyt) %>%
-  # count and add species occurrence in each xyt
-  summarise(across(count, sum), .groups = "drop") %>%
-  # reshape to wide format to have specie by xyt dataframe
-  pivot_wider(names_from = xyt, values_from = count)
 
+#### Site by Environment ####
+path = "C:/Users/mukht/Documents"
+
+# Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
+bio_10m = geodata::worldclim_global(var='bio',
+                                    res=10, path=path,
+                                    version="2.1") # Set your own path directory
+
+# Define 'extent' of boundary
+# South Africa
+rsa_ext = extent(rsa_country_sf)
+
+# Crop Bioclimatic variables to extent of South African boundary
+rsa_bio_10m = crop(bio_10m, rsa_ext)
+
+# Transfer values from worldclim raster data to QDS
+bioQDS<-resample(rsa_bio_10m,gridQDS_mask) # bilinear interpolation 
+
+# mask bioQDS to rsa land
+bioQDS<-mask(bioQDS,rsa_mask)
+
+# extract site by environment from the bioQDS layers
+sitebyEnv <- as.data.frame(bioQDS[])
+sitebyEnv
+
+plot(bioQDS[[1]])
 
 
 #####
@@ -202,20 +210,6 @@ uN[7]
 plot(gridQDS[[uN[7]]])
 plot(filter(taxa.sf, species==uN[7]),add=TRUE)
 
-##### TRY data ####
-library(rtry)
-
-path_to_data <- system.file("testdata", "data_TRY_15160.txt", package = "rtry")
-path_to_data
-
-data_TRY_15160 <- rtry_import(path_to_data)
-input_path<-"C://Users//26485613//OneDrive - Stellenbosch University//Documents//Practice space"
-
-tryFULL.df<-rtry_import(input_path,
-                         separator = ",",
-                         encoding = "UTF-8",
-                         quote = "\"",
-                         showOverview = TRUE)
 
 
 
@@ -225,14 +219,6 @@ taxa.sf %>%
   drop_na(species) %>%
   count(species, sort = TRUE) %>%
   filter(n>10)
-
-
-
-
-plot(countQDS)# plot grid cell
-plot(taxa.sf[1], add=TRUE) #add occurrence points
-
-
 
 
 
@@ -271,12 +257,6 @@ dataGEN = function(arg1,TaxaName..){
 }
 
 
-
-
-gridQDS
-plot(gridQDS[[uN[90:93]]])
-
-
 r <- rast(ext(taxa.sf),nrows=4, ncols=3, nlyrs=3)
 # Assign unique IDs to each cell
 names(r)<- c("ID","sp1","sp2")
@@ -298,26 +278,7 @@ print(coords)
 data.frame(r)
 
 
-rfield = rasterize(dplyr::filter(taxa.sf, species==uN[67]),
-                     r,
-                     field=1,
-                     fun="max",
-                     background = 0)
 
-data.frame(rfield)
-plot(rfield)
-plot(dplyr::filter(taxa.sf, species==uN[67]), add=T)
-
-sp1<-taxa.sf$geometry[1:12]
-sp2<-taxa.sf$geometry[101:112]
-
-taxa.sf %>%
-  group_by(species) %>%
-  filter(species=="Clerodendrum ternatum") #%>%
-  #count(species)
-taxa.sf[,2]
-dplyr::filter(taxa.sf, species==uN[67])
-sum(speciesQDS[])
 
 
 chelsaA18 <- terra::rast('CHELSA_swb_2018_V.2.1.tif')
@@ -325,7 +286,7 @@ plot(chelsaA18)
 chelsa.SA<-crop(chelsaA18,ext(taxa.sf))
 plot(chelsa.SA)
 chelsa.SA[]
-envSA<-rasterize(chelsa.SA,
+envSA<-rasterize(chelsa.SA, #ERROR
                  gridQDS,
                  field=1,
                  fun=mean,
@@ -337,24 +298,5 @@ juli<-data.frame("origDate"=taxa.occ$dateIdentified,
 lubri<-data.frame("origDate"=taxa.occ$dateIdentified,
                   "lubriDate"=yday(taxa.occ$dateIdentified))
 
-
-
-t=7
-system.time(for(n in uN){
-  # create raster of species
-  speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==7),
-                         gridQDS,
-                         field=1,
-                         fun="max",
-                         background = 0)
-  # insert occurrence layer for each species to it assigned layer
-  gridQDS[[n]] <- speciesQDS[]
-}
-)
-
-# mask the site
-gridQDS_mask.t = mask(gridQDS, rsa_mask)
-
-# create data frame of site by species
-Speciesbyxyt[[paste0("P",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
-
+df <- apply(taxa.df,2,as.character)
+write.table(df,"taxa(Acacia).csv",row.names = F)
