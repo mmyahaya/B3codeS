@@ -51,7 +51,7 @@ system.time(for(n in uN){
   speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
                          gridQDS,
                          field=1,
-                         fun="max",
+                         fun="sum",
                          background = 0)
   # insert occurrence layer for each species to it assigned layer
   gridQDS[[n]] <- speciesQDS[]
@@ -60,10 +60,10 @@ system.time(for(n in uN){
 rsa_mask = rasterize(rsa_country_sf, gridQDS, background=NA)
 
 gridQDS_mask = mask(gridQDS, rsa_mask)
-
+plot(gridQDS_mask[[uN[10:16]]])
 # create data frame of site by species
 SitebySpecies <- as.data.frame(gridQDS_mask[])
-
+sbs<-drop_na(SitebySpecies,siteID)
 ##### speciebyxyt ####
 
 taxa.sf$day <- yday(taxa.sf$dateIdentified)
@@ -300,3 +300,4 @@ lubri<-data.frame("origDate"=taxa.occ$dateIdentified,
 
 df <- apply(taxa.df,2,as.character)
 write.table(df,"taxa(Acacia).csv",row.names = F)
+length(base::setdiff(unique(taxa.df$species),uN))
