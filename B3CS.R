@@ -272,6 +272,7 @@ plot(chelsaA18)
 chelsa.SA<-crop(chelsaA18,ext(taxa.sf))
 plot(chelsa.SA)
 chelsa.SA[]
+#error
 envSA<-rasterize(chelsa.SA,
                  gridQDS,
                  field=1,
