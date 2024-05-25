@@ -193,15 +193,16 @@ rsa_bio_10m = crop(bio_10m, rsa_ext)
 
 # Transfer values from worldclim raster data to QDS
 bioQDS<-resample(rsa_bio_10m,gridQDS) # bilinear interpolation 
-
+bioQDS[["siteID"]]<-1:ncell(bioQDS)
 # mask bioQDS to rsa land
 bioQDS<-mask(bioQDS,rsa_mask)
 
 # extract site by environment from the bioQDS layers
-sitebyEnv <- as.data.frame(bioQDS[])
-sitebyEnv
+{sitebyEnv <- as.data.frame(bioQDS[])
+sitebyEnv <- drop_na(sitebyEnv,siteID)
+sbeM<-as.matrix(sitebyEnv)
+colnames(sbeM)<-NULL}
 
-plot(bioQDS[[1]])
 
 
 #####
