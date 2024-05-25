@@ -23,7 +23,7 @@ taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded fi
 
 
 taxa.occ = taxa.df %>%
-  dplyr::select(speciesKey,decimalLatitude,decimalLongitude,
+  dplyr::select(decimalLatitude,decimalLongitude,
                 species,dateIdentified) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
@@ -73,6 +73,7 @@ taxa.sf <- taxa.sf %>%
   mutate(period = case_when(
     year == 2024 ~ 1,
     year == 2023  ~ 2,
+    
     year == 2022  ~ 3,
     year == 2021 ~ 4,
     year == 2020  ~ 5,
@@ -205,56 +206,10 @@ colnames(sbeM)<-NULL}
 
 
 
-#####
-taxa.sf$count=1
-# Define a grid over spatial extend
-gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326")
-
-countQDS = rasterize(taxa.sf,
-                     gridQDS,
-                     field='count',
-                     fun=sum,
-                     background = 0)
-
-
-rasterVis::levelplot(countQDS)->countPlot # improve plots
-plot(countQDS)
-plot(taxa.sf[1], add=TRUE)
-
-
-uN[7]
-plot(gridQDS[[uN[7]]])
-plot(filter(taxa.sf, species==uN[7]),add=TRUE)
 
 
 
 
-
-##### Junks ####
-taxa.sf %>%
-  drop_na(species) %>%
-  count(species, sort = TRUE) %>%
-  filter(n>10)
-
-
-
-
-
-##### Junks ####
-taxa.df %>%
-  drop_na(species) %>%
-  count(species, sort = TRUE) %>%
-  filter(n>3)
-
-summary(CATtrait.df)
-
-CATtrait.df<- CATtrait.df %>%
-  mutate(decade=ifelse(dateIdentified>as.Date("2024-02-28"),"First","Second"))
-
-try33576.df %>%
-  dplyr::group_by(AccSpeciesName, TraitID) %>%
-  dplyr::summarise(n = dplyr::n(), .groups = "drop") %>%
-  dplyr::filter(n > 1L)
 
 dataGEN = function(arg1,TaxaName..){
 
@@ -287,11 +242,8 @@ print(r)
 plot(r$sp1)
 plot(sp1, add=T)
 # Get coordinates of each cell
-coords <- xyFromCell(r, 1:12)
+coords <- raster::xyFromCell(r,c(1,4,5,11))
 
-# Print the coordinates
-print(coords)
-data.frame(r)
 
 
 
