@@ -27,14 +27,13 @@ taxa.occ = taxa.df %>%
                 species,dateIdentified) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
-
 taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
                   crs = 4326) # convert long and lat point to geometry
 
 
 #### Site by Species #####
 # extract unique species name from GBIF occurrence data
-uN<-unique(taxa.sf$species)
+uN<-sort(unique(taxa.sf$species))
 # Read RSA land area shapefile
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
@@ -59,25 +58,27 @@ system.time(for(n in uN){
 # Make QDS Mask. Remember to mask the background to NA
 rsa_mask = rasterize(rsa_country_sf, gridQDS, background=NA)
 
-gridQDS_mask = mask(gridQDS, rsa_mask)
-plot(gridQDS_mask[[uN[10:16]]])
+gridQDS = mask(gridQDS, rsa_mask)
+
 # create data frame of site by species
-SitebySpecies <- as.data.frame(gridQDS_mask[])
-sbs<-drop_na(SitebySpecies,siteID)
+sbs <- as.data.frame(gridQDS)
+sbs<-drop_na(sbs,siteID)
+sbsM<-as.matrix(sbs[,-1])
+colnames(sbsM)<-NULL
 ##### speciebyxyt ####
 
-taxa.sf$day <- yday(taxa.sf$dateIdentified)
+#taxa.sf$day <- yday(taxa.sf$dateIdentified)
+taxa.sf$year<-year(taxa.sf$dateIdentified)
 taxa.sf <- taxa.sf %>% 
   mutate(period = case_when(
-    day >= 1 & day <= 14 ~ 1,
-    day >= 15 & day <= 28 ~ 2,
-    day >= 29 & day <= 42 ~ 3,
-    day >= 43 & day <= 56 ~ 4,
-    day >= 57 & day <= 70 ~ 5,
-    day >= 71 & day <= 84 ~ 6,
-    day >= 85 & day <= 98 ~ 7,
-    day >= 99 & day <= 112 ~ 8,
-    day >= 113 & day <= 126 ~ 9,
+    year == 2024 ~ 1,
+    year == 2023  ~ 2,
+    year == 2022  ~ 3,
+    year == 2021 ~ 4,
+    year == 2020  ~ 5,
+    year == 2019  ~ 6,
+    year == 2018  ~ 7,
+    year <= 2017  ~ 8,
     TRUE ~ NA_integer_  # Default case, if any value falls outside the specified ranges
   ))
 # create an empty list for species by xyt
@@ -88,17 +89,24 @@ system.time(for (t in sort(unique(taxa.sf$period))) {
     speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==t),
                            gridQDS,
                            field=1,
-                           fun="max",
+                           fun="sum",
                            background = 0)
     # insert occurrence layer for each species to it assigned layer
     gridQDS[[n]] <- speciesQDS[]
   }
   
   # mask the site
-  gridQDS_mask.t = mask(gridQDS, rsa_mask)
+  gridQDS.t = mask(gridQDS, rsa_mask)
+  
+  sbs.t <- as.data.frame(gridQDS.t)
+  sbs.t<-drop_na(sbs.t,siteID)
+  sbsM.t<-as.matrix(sbs[,-1])
+  colnames(sbsM.t)<-NULL
   
   # create data frame of site by species
-  Speciesbyxyt[[paste0("T",t)]] <- as.data.frame(t(gridQDS_mask.t[]))
+  
+  
+  Speciesbyxyt[[paste0("T",t)]] <- sbsM.t
   
 })
 
@@ -126,10 +134,11 @@ dput(traitID)
 
 
 
-input_path<-"C:/Users/mukht/Downloads/33576.txt"
+input_path<-"33852.txt"
+  #"C:/Users/mukht/Downloads/33576.txt"
   #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
 
-try33576<-rtry_import(
+try33852<-rtry_import(
   input=input_path,
   separator = "\t",
   encoding = "Latin-1",
@@ -138,7 +147,7 @@ try33576<-rtry_import(
 )
 
 
-SpeciesbyTrait<-try33576 %>%
+SpeciesbyTrait<-try33852 %>%
   # drop rows which contains no trait
   drop_na(TraitID) %>%
   # select species name, trait and trait value
@@ -158,7 +167,11 @@ SpeciesbyTrait<-try33576 %>%
                             ncol = ncol(SpeciesbyTrait)))
 row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
 names(na.df)<-names(SpeciesbyTrait) # column names
-SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)}
+SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
+SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
+sbtM<-as.matrix(SpeciesbyTrait)
+rownames(sbtM)<-NULL
+colnames(sbtM)<-NULL}
 
 
 #### Site by Environment ####
@@ -171,13 +184,15 @@ bio_10m = geodata::worldclim_global(var='bio',
 
 # Define 'extent' of boundary
 # South Africa
-rsa_ext = extent(rsa_country_sf)
+rsa_ext = raster::extent(rsa_country_sf)
 
 # Crop Bioclimatic variables to extent of South African boundary
 rsa_bio_10m = crop(bio_10m, rsa_ext)
 
+
+
 # Transfer values from worldclim raster data to QDS
-bioQDS<-resample(rsa_bio_10m,gridQDS_mask) # bilinear interpolation 
+bioQDS<-resample(rsa_bio_10m,gridQDS) # bilinear interpolation 
 
 # mask bioQDS to rsa land
 bioQDS<-mask(bioQDS,rsa_mask)
@@ -293,11 +308,12 @@ envSA<-rasterize(chelsa.SA, #ERROR
                  background = 0)
 
 
-juli<-data.frame("origDate"=taxa.occ$dateIdentified,
-                 "JuliDate"=julian(taxa.occ$dateIdentified))
-lubri<-data.frame("origDate"=taxa.occ$dateIdentified,
-                  "lubriDate"=yday(taxa.occ$dateIdentified))
 
 df <- apply(taxa.df,2,as.character)
 write.table(df,"taxa(Acacia).csv",row.names = F)
 length(base::setdiff(unique(taxa.df$species),uN))
+
+
+plot(gridQDS[[uN[24]]])
+plot(dplyr::filter(taxa.sf, species==uN[24]),add=T)
+lines(rsa_country_sf['Land'])
