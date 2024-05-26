@@ -175,6 +175,18 @@ rownames(sbtM)<-NULL
 colnames(sbtM)<-NULL}
 
 
+
+traitname<-try33852 %>%
+  # drop rows which contains no trait
+  drop_na(TraitID) %>%
+  # select species name, trait and trait value
+  select(TraitID,TraitName) %>%
+  group_by(TraitID) %>%
+  summarise(across(TraitName, first), .groups = "drop") %>% 
+  column_to_rownames("TraitID")
+#create Trait name to align with the sbt column  
+traitname<-traitname[colnames(SpeciesbyTrait),]
+traitname<-data.frame('TraitID'=colnames(SpeciesbyTrait),'TraitName'=traitname) 
 #### Site by Environment ####
 path = "C:/Users/mukht/Documents"
 
@@ -201,7 +213,7 @@ bioQDS<-mask(bioQDS,rsa_mask)
 # extract site by environment from the bioQDS layers
 {sitebyEnv <- as.data.frame(bioQDS[])
 sitebyEnv <- drop_na(sitebyEnv,siteID)
-sbeM<-as.matrix(sitebyEnv)
+sbeM<-as.matrix(dplyr::select(sitebyEnv, !siteID)) 
 colnames(sbeM)<-NULL}
 
 

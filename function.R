@@ -1,4 +1,4 @@
-taxa.data <- function(taxa,limit){
+taxaFun <- function(taxa,limit){
   gbif_download = occ_data(scientificName=taxa, # download data from gbif
                            country='ZA',
                            hasCoordinate=TRUE,
@@ -17,11 +17,11 @@ taxa.data <- function(taxa,limit){
                     crs = 4326)
   return(taxa.sf)
 }
-#taxa.sf <- taxa.data('Acacia',500)
+taxa.sf <- taxaFun('Acacia',500)
 # Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
 #  write.csv(taxa.sf,"taxa.sf.csv",row.names = FALSE)
 
-sbsMatrix <- function(taxa.sf,country.shp){
+sbsFun <- function(taxa.sf,country.shp){
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$species))
   # Create grid cells with extent of country shapefile and layers for siteID and species
@@ -57,12 +57,12 @@ sbsMatrix <- function(taxa.sf,country.shp){
   sbsM.binary[sbsM.binary>0]<-1
   return(list("sbs"=sbsM,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
 }
-sbs<-sbsMatrix(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
+sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
 
 path = "C:/Users/mukht/Documents"
 
 
-sbeMatrix<- function(path,country.shp){
+sbeFun<- function(path,country.shp){
   # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
   bio_10m = geodata::worldclim_global(var='bio',
                                       res=10, path=path,
@@ -97,6 +97,61 @@ sbeMatrix<- function(path,country.shp){
 }
 
 
-sbe<-sbeMatrix(path = path, country.shp = rsa_country_sf )
+sbe<-sbeFun(path = path, country.shp = rsa_country_sf )
 
 
+try_path<-"33852.txt"
+sbtFun<-function(try_path,taxa.sf){
+  
+  trydata<-rtry_import(
+    input=try_path,
+    separator = "\t",
+    encoding = "Latin-1",
+    quote = "",
+    showOverview = TRUE
+  )
+  # extract unique species name from GBIF occurrence data
+  uN<-sort(unique(taxa.sf$species))
+  
+  SpeciesbyTrait<-trydata %>%
+    # drop rows which contains no trait
+    drop_na(TraitID) %>%
+    # select species name, trait and trait value
+    select(AccSpeciesName,TraitID,TraitName,OrigValueStr) %>%
+    #group by Species and trait
+    group_by(AccSpeciesName,TraitID) %>%
+    #choose the first trait value if there are multiples trait for a species
+    summarise(across(OrigValueStr, first), .groups = "drop") %>%
+    # reshape to wide format to have specie by trait dataframe
+    pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>% 
+    # select species that are only present in gbif data
+    filter(AccSpeciesName %in% uN) %>% 
+    # convert species names to row names
+    column_to_rownames(var = "AccSpeciesName") 
+  # add the rows of the remaining species without traits from TRY
+  na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
+                               ncol = ncol(SpeciesbyTrait)))
+    row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
+    names(na.df)<-names(SpeciesbyTrait) # column names
+    SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
+    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
+    sbtM<-as.matrix(SpeciesbyTrait)
+    rownames(sbtM)<-NULL
+    colnames(sbtM)<-NULL
+    
+    traitname<-trydata %>%
+      # drop rows which contains no trait
+      drop_na(TraitID) %>%
+      # select species name, trait and trait value
+      select(TraitID,TraitName) %>%
+      group_by(TraitID) %>%
+      summarise(across(TraitName, first), .groups = "drop") %>% 
+      column_to_rownames("TraitID")
+    #create Trait name to align with the sbt column  
+    traitname<-traitname[colnames(SpeciesbyTrait),]
+    traitname<-data.frame('TraitID'=colnames(SpeciesbyTrait),'TraitName'=traitname)
+  return(list("sbt"=sbtM,"traitname"=traitname))
+  
+}
+
+sbt<-sbtFun(try_path = try_path,taxa.sf = taxa.sf)
