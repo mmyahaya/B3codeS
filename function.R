@@ -42,8 +42,8 @@ sbsMatrix <- function(taxa.sf,country.shp){
     gridQDS[[n]] <- speciesQDS[]
   })
   # Make QDS Mask with NA as background 
-  rsa_mask = rasterize(country.shp, gridQDS, background=NA)
-  gridQDS = mask(gridQDS, rsa_mask)
+  country_mask = rasterize(country.shp, gridQDS, background=NA)
+  gridQDS = mask(gridQDS, country_mask)
   
   # create data frame of site by species
   sbs <- as.data.frame(gridQDS)
@@ -58,3 +58,45 @@ sbsMatrix <- function(taxa.sf,country.shp){
   return(list("sbs"=sbsM,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
 }
 sbs<-sbsMatrix(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
+
+path = "C:/Users/mukht/Documents"
+
+
+sbeMatrix<- function(path,country.shp){
+  # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
+  bio_10m = geodata::worldclim_global(var='bio',
+                                      res=10, path=path,
+                                      version="2.1") # Set your own path directory
+  
+  # Define 'extent' of boundary
+  ext = raster::extent(country.shp)
+  
+  # Crop Bioclimatic variables to extent of of the country's boundary
+  bio_10m = crop(bio_10m, ext)
+  
+  gridQDS = rast(country.shp,res=c(0.25,0.25), crs="EPSG:4326")
+  
+  
+  # Transfer values from worldclim raster data to QDS
+  bioQDS<-resample(bio_10m,gridQDS) # bilinear interpolation 
+  bioQDS[["siteID"]]<-1:ncell(bioQDS)
+  
+  # Make QDS Mask with NA as background 
+  country_mask = rasterize(country.shp, gridQDS, background=NA)
+  
+  # mask bioQDS to the country map
+  bioQDS<-mask(bioQDS,country_mask)
+  
+  # extract site by environment from the bioQDS layers
+  {sitebyEnv <- as.data.frame(bioQDS[])
+    sitebyEnv <- drop_na(sitebyEnv,siteID)
+    sbeM<-as.matrix(dplyr::select(sitebyEnv, !siteID))
+    variable.name<-colnames(sbeM)
+    colnames(sbeM)<-NULL}
+  return(list("sbe"=sbeM,"variable.name"=variable.name))
+}
+
+
+sbe<-sbeMatrix(path = path, country.shp = rsa_country_sf )
+
+
