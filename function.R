@@ -9,15 +9,14 @@ library(rasterVis)
 library(lubridate)
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 # add reference and get it sbs
-taxaFun <- function(taxa,limit){
-  gbif_download = occ_data(scientificName=taxa, # download data from gbif
+taxaFun <- function(taxa,limit=500, ref=NULL){
+  taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
                            country='ZA',
                            hasCoordinate=TRUE,
                            hasGeospatialIssue=FALSE,
                            limit = limit)
   
-  taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
-  
+  taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
   
   taxa.df = taxa.df %>%
     dplyr::select(decimalLatitude,decimalLongitude,
@@ -26,7 +25,28 @@ taxaFun <- function(taxa,limit){
     mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
   taxa.sf<-st_as_sf(taxa.df,coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326)
-  return(taxa.sf)
+  if(!is.null(ref)){
+    ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
+                                 country='ZA',
+                                 hasCoordinate=TRUE,
+                                 hasGeospatialIssue=FALSE,
+                                 limit = limit)
+    
+    ref.df = as.data.frame(ref.gbif_download$data)
+    
+    ref.df = ref.df %>%
+      dplyr::select(decimalLatitude,decimalLongitude,
+                    species,dateIdentified) %>% #select occurrence data
+      filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+      mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
+    ref.sf<-st_as_sf(ref.df,coords = c("decimalLongitude", "decimalLatitude"),
+                     crs = 4326)
+  } else {
+    ref.sf=taxa.sf
+  }
+  
+  
+  return(list("taxa"=taxa.sf,"ref"=ref.sf))
 }
 
 # Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
@@ -70,28 +90,37 @@ sbsFun <- function(taxa.sf,country.shp){
 
 
 
-sbeFun<- function(path,country.shp){
-  # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
-  bio_10m = geodata::worldclim_global(var='bio',
-                                      res=10, path=path,
-                                      version="2.1") # Set your own path directory
+sbeFun<- function(rastfile,country.shp){
+  
+  # read the rastfile if path is given
+  if("character" %in% class(rastfile)){
+    # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
+    env = geodata::worldclim_global(var='bio',
+                                        res=10, path=rastfile,
+                                        version="2.1") # Set your own path directory
+  } else if("SpatRaster" %in% class(rastfile)){
+    env<-rastfile
+  } else { # stop and report if rastfile is not a file path or SpatRaster
+    cli::cli_abort(c("{.var rastfile} is not a file path or SpatRaster"))
+  }
+ 
   
   # Crop Bioclimatic variables to extent of of the country's boundary
-  bio_10m = crop(bio_10m, rsa_country_sf)
+  env = crop(env, country.shp)
  
   gridQDS = rast(country.shp,res=c(0.25,0.25), crs="EPSG:4326")
   
   
-  # Transfer values from worldclim raster data to QDS
-  bioQDS<-resample(bio_10m,gridQDS) # bilinear interpolation 
-  bioQDS[["siteID"]]<-1:ncell(bioQDS)
+  # Transfer values from rastfile data to QDS
+  envQDS<-resample(env,gridQDS) # bilinear interpolation 
+  envQDS[["siteID"]]<-1:ncell(envQDS)
   
   
-  # mask bioQDS to the country map
-  bioQDS<-mask(bioQDS,country.shp)
+  # mask envQDS to the country map
+  envQDS<-mask(envQDS,country.shp)
   
   # extract site by environment from the bioQDS layers
-  {sitebyEnv <- as.data.frame(bioQDS[])
+  {sitebyEnv <- as.data.frame(envQDS[])
     sitebyEnv <- drop_na(sitebyEnv,siteID)
     sbeM<-as.matrix(dplyr::select(sitebyEnv, !siteID))
     variable.name<-colnames(sbeM)
@@ -169,13 +198,18 @@ sbtFun<-function(tryfile,taxa.sf){
 }
 
 
-taxa.sf <- taxaFun('Acacia',500)
+taxa.sf <- taxaFun('indigofera',600)
 sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
 
 path = "C:/Users/mukht/Documents" #path for worldclim
 
-sbe<-sbeFun(path = path, country.shp = rsa_country_sf )
+precdata <- rast('prec_2021-2040.tif')
+
+
+sbe<-sbeFun(rastfile= precdata, country.shp = rsa_country_sf )
 
 try_path<-"33852.txt" # path for trydata
 
 sbt<-sbtFun(tryfile = trytest,taxa.sf = taxa.sf)
+
+
