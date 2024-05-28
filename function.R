@@ -1,3 +1,14 @@
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(rgbif) # for occ_download
+library(terra)
+library(sf)
+library(rtry) # for processing try data
+library(rasterVis)
+library(lubridate)
+rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
+# add reference and get it sbs
 taxaFun <- function(taxa,limit){
   gbif_download = occ_data(scientificName=taxa, # download data from gbif
                            country='ZA',
@@ -17,10 +28,10 @@ taxaFun <- function(taxa,limit){
                     crs = 4326)
   return(taxa.sf)
 }
-taxa.sf <- taxaFun('Acacia',500)
+
 # Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
 #  write.csv(taxa.sf,"taxa.sf.csv",row.names = FALSE)
-
+#add res
 sbsFun <- function(taxa.sf,country.shp){
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$species))
@@ -41,9 +52,8 @@ sbsFun <- function(taxa.sf,country.shp){
     # insert occurrence layer for each species to it assigned layer
     gridQDS[[n]] <- speciesQDS[]
   })
-  # Make QDS Mask with NA as background 
-  country_mask = rasterize(country.shp, gridQDS, background=NA)
-  gridQDS = mask(gridQDS, country_mask)
+ # mask grid cells to country shape file
+  gridQDS = mask(gridQDS, country.shp)
   
   # create data frame of site by species
   sbs <- as.data.frame(gridQDS)
@@ -57,9 +67,7 @@ sbsFun <- function(taxa.sf,country.shp){
   sbsM.binary[sbsM.binary>0]<-1
   return(list("sbs"=sbsM,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
 }
-sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
 
-path = "C:/Users/mukht/Documents"
 
 
 sbeFun<- function(path,country.shp){
@@ -68,12 +76,9 @@ sbeFun<- function(path,country.shp){
                                       res=10, path=path,
                                       version="2.1") # Set your own path directory
   
-  # Define 'extent' of boundary
-  ext = raster::extent(country.shp)
-  
   # Crop Bioclimatic variables to extent of of the country's boundary
-  bio_10m = crop(bio_10m, ext)
-  
+  bio_10m = crop(bio_10m, rsa_country_sf)
+ 
   gridQDS = rast(country.shp,res=c(0.25,0.25), crs="EPSG:4326")
   
   
@@ -81,11 +86,9 @@ sbeFun<- function(path,country.shp){
   bioQDS<-resample(bio_10m,gridQDS) # bilinear interpolation 
   bioQDS[["siteID"]]<-1:ncell(bioQDS)
   
-  # Make QDS Mask with NA as background 
-  country_mask = rasterize(country.shp, gridQDS, background=NA)
   
   # mask bioQDS to the country map
-  bioQDS<-mask(bioQDS,country_mask)
+  bioQDS<-mask(bioQDS,country.shp)
   
   # extract site by environment from the bioQDS layers
   {sitebyEnv <- as.data.frame(bioQDS[])
@@ -97,10 +100,8 @@ sbeFun<- function(path,country.shp){
 }
 
 
-sbe<-sbeFun(path = path, country.shp = rsa_country_sf )
 
 
-try_path<-"33852.txt"
 sbtFun<-function(try_path,taxa.sf){
   
   trydata<-rtry_import(
@@ -153,5 +154,15 @@ sbtFun<-function(try_path,taxa.sf){
   return(list("sbt"=sbtM,"traitname"=traitname))
   
 }
+
+
+taxa.sf <- taxaFun('Acacia',500)
+sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
+
+path = "C:/Users/mukht/Documents" #path for worldclim
+
+sbe<-sbeFun(path = path, country.shp = rsa_country_sf )
+
+try_path<-"33852.txt" # path for trydata
 
 sbt<-sbtFun(try_path = try_path,taxa.sf = taxa.sf)

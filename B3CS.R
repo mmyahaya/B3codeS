@@ -1,14 +1,6 @@
 
 
-library(dplyr)
-library(readr)
-library(tidyverse)
-library(rgbif) # for occ_download
-library(terra)
-library(sf)
-library(rtry) # for processing try data
-library(rasterVis)
-library(lubridate)
+
 
 ##### gbif data ####
 taxa = 'Acacia' # scientific name
@@ -55,10 +47,11 @@ system.time(for(n in uN){
   # insert occurrence layer for each species to it assigned layer
   gridQDS[[n]] <- speciesQDS[]
 })
-# Make QDS Mask. Remember to mask the background to NA
-rsa_mask = rasterize(rsa_country_sf, gridQDS, background=NA)
+# Mask the grid cell to country shape file
 
-gridQDS = mask(gridQDS, rsa_mask)
+gridQDS = mask(gridQDS, rsa_country_sf)
+#plot(gridQDS[[6]])
+#lines(rsa_country_sf['Land'])
 
 # create data frame of site by species
 sbs <- as.data.frame(gridQDS)
@@ -97,7 +90,7 @@ system.time(for (t in sort(unique(taxa.sf$period))) {
   }
   
   # mask the site
-  gridQDS.t = mask(gridQDS, rsa_mask)
+  gridQDS.t = mask(gridQDS, rsa_country_sf)
   
   sbs.t <- as.data.frame(gridQDS.t)
   sbs.t<-drop_na(sbs.t,siteID)
@@ -208,7 +201,7 @@ rsa_bio_10m = crop(bio_10m, rsa_ext)
 bioQDS<-resample(rsa_bio_10m,gridQDS) # bilinear interpolation 
 bioQDS[["siteID"]]<-1:ncell(bioQDS)
 # mask bioQDS to rsa land
-bioQDS<-mask(bioQDS,rsa_mask)
+bioQDS<-mask(bioQDS,rsa_country_sf)
 
 # extract site by environment from the bioQDS layers
 {sitebyEnv <- as.data.frame(bioQDS[])
