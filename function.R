@@ -102,15 +102,28 @@ sbeFun<- function(path,country.shp){
 
 
 
-sbtFun<-function(try_path,taxa.sf){
+sbtFun<-function(tryfile,taxa.sf){
+  # read the try data if path is given
+  if("character" %in% class(tryfile)){
+    trydata<-rtry_import(
+      input=tryfile,
+      separator = "\t",
+      encoding = "Latin-1",
+      quote = "",
+      showOverview = TRUE
+    )
+  } else if("data.frame" %in% class(tryfile)){
+    trydata<-tryfile
+  } else { # stop and report if tryfile is not a file path or dataframe
+    cli::cli_abort(c("{.var tryfile} is not a file path or dataframe"))
+    }
   
-  trydata<-rtry_import(
-    input=try_path,
-    separator = "\t",
-    encoding = "Latin-1",
-    quote = "",
-    showOverview = TRUE
-  )
+  if(any(!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile))){
+    requiredcol<-c("AccSpeciesName","TraitID","TraitName","OrigValueStr")
+    missingcol<-requiredcol[!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile)]
+    cli::cli_abort(c("{missingcol} is/are not in the {.var tryfile} column "))
+  }
+    
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$species))
   
@@ -165,4 +178,4 @@ sbe<-sbeFun(path = path, country.shp = rsa_country_sf )
 
 try_path<-"33852.txt" # path for trydata
 
-sbt<-sbtFun(try_path = try_path,taxa.sf = taxa.sf)
+sbt<-sbtFun(tryfile = trytest,taxa.sf = taxa.sf)
