@@ -14,12 +14,12 @@ library(lubridate)
 taxa = 'Acacia' # scientific name
 
 gbif_download = occ_data(scientificName=taxa, # download data from gbif
-                         country='ZA',
+                         #country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 17726)
+                         limit = 500)
 
-taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
+taxa.df = gbif_download$data #extract data from the downloaded file
 
 
 taxa.occ = taxa_df %>%
@@ -126,15 +126,15 @@ dput(traitID)
 
 
 
-input_path<-"C:/Users/mukht/Downloads/33576.txt"
-  #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
+input_path<-"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
+  # "C:/Users/mukht/Downloads/33576.txt"
 
 try33576<-rtry_import(
   input=input_path,
   separator = "\t",
   encoding = "Latin-1",
   quote = "",
-  showOverview = TRUE
+  showOverview = FALSE
 )
 
 
@@ -189,56 +189,11 @@ sitebyEnv
 plot(bioQDS[[1]])
 
 
-#####
-taxa.sf$count=1
-# Define a grid over spatial extend
-gridQDS = rast(ext(taxa.sf),res=c(0.25,0.25), crs="EPSG:4326")
-
-countQDS = rasterize(taxa.sf,
-                     gridQDS,
-                     field='count',
-                     fun=sum,
-                     background = 0)
-
-
-rasterVis::levelplot(countQDS)->countPlot # improve plots
-plot(countQDS)
-plot(taxa.sf[1], add=TRUE)
-
-
-uN[7]
-plot(gridQDS[[uN[7]]])
-plot(filter(taxa.sf, species==uN[7]),add=TRUE)
 
 
 
 
 
-##### Junks ####
-taxa.sf %>%
-  drop_na(species) %>%
-  count(species, sort = TRUE) %>%
-  filter(n>10)
-
-
-
-
-
-##### Junks ####
-taxa.df %>%
-  drop_na(species) %>%
-  count(species, sort = TRUE) %>%
-  filter(n>3)
-
-summary(CATtrait.df)
-
-CATtrait.df<- CATtrait.df %>%
-  mutate(decade=ifelse(dateIdentified>as.Date("2024-02-28"),"First","Second"))
-
-try33576.df %>%
-  dplyr::group_by(AccSpeciesName, TraitID) %>%
-  dplyr::summarise(n = dplyr::n(), .groups = "drop") %>%
-  dplyr::filter(n > 1L)
 
 dataGEN = function(arg1,TaxaName..){
 
@@ -286,16 +241,7 @@ plot(chelsaA18)
 chelsa.SA<-crop(chelsaA18,ext(taxa.sf))
 plot(chelsa.SA)
 chelsa.SA[]
-<<<<<<< HEAD
-#error
-envSA<-rasterize(chelsa.SA,
-=======
-envSA<-rasterize(chelsa.SA, #ERROR
->>>>>>> e0646fd47263ce498906c2b1ab8c4b38d2934c59
-                 gridQDS,
-                 field=1,
-                 fun=mean,
-                 background = 0)
+
 
 
 juli<-data.frame("origDate"=taxa.occ$dateIdentified,

@@ -7,17 +7,37 @@ library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
 library(lubridate)
-rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
+rsa_country_sf = st_read("C:/Users/26485613/OneDrive - Stellenbosch University/Downloads/Code_Data/Code_Data/boundary_south_africa_land_geo.shp")
+# "C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp"
 # add reference and get it sbs
-taxaFun <- function(taxa,limit=500, ref=NULL){
-  taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
-                           country='ZA',
-                           hasCoordinate=TRUE,
-                           hasGeospatialIssue=FALSE,
-                           limit = limit)
-  
-  taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
-  
+taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
+  # if(length(country)==2){
+  #   country<-country
+  # } else if(is.null(country)){
+  #   country<-country
+  # } else if
+  # download taxa if scientific name is given
+  if("character" %in% class(taxa)){
+    taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
+                                  country='ZA',
+                                  hasCoordinate=TRUE,
+                                  hasGeospatialIssue=FALSE,
+                                  limit = limit)
+
+    taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
+  } else if("data.frame" %in% class(taxa)){
+    taxa.df<-taxa
+  } else { # stop and report if taxa is not a scientific name or dataframe
+    cli::cli_abort(c("{.var taxa} is not a scientific name or dataframe"))
+  }
+
+  if(any(!c("decimalLatitude","decimalLongitude",
+            "species","dateIdentified") %in% colnames(taxa))){
+    requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
+    missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","dateIdentified") %in% colnames(tryfile)]
+    cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column "))
+  }
+
   taxa.df = taxa.df %>%
     dplyr::select(decimalLatitude,decimalLongitude,
                   species,dateIdentified) %>% #select occurrence data
@@ -32,9 +52,9 @@ taxaFun <- function(taxa,limit=500, ref=NULL){
                                  hasCoordinate=TRUE,
                                  hasGeospatialIssue=FALSE,
                                  limit = limit)
-    
+
     ref.df = as.data.frame(ref.gbif_download$data)
-    
+
     ref.df = ref.df %>%
       dplyr::select(decimalLatitude,decimalLongitude,
                     species,dateIdentified) %>% #select occurrence data
@@ -45,8 +65,8 @@ taxaFun <- function(taxa,limit=500, ref=NULL){
   } else {
     ref.sf=taxa.sf
   }
-  
-  
+
+
   return(list("taxa"=taxa.sf,"ref"=ref.sf))
 }
 
@@ -75,7 +95,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
   }
  # mask grid cells to country shape file
   gridQDS = mask(gridQDS, country.shp)
-  
+
   # create data frame of site by species
   sbs <- as.data.frame(gridQDS)
   sbs<-drop_na(sbs,siteID)
@@ -87,7 +107,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
   # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
-  
+
   # compute sbs for ref if it is different from taxa
   if(identical(taxa.sf$taxa,taxa.sf$ref)){
     sbsM.ref<-sbsM
@@ -114,23 +134,24 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
     }
     # mask grid cells to country shape file
     gridQDS = mask(gridQDS, country.shp)
-    
+
     # create data frame of site by species
     sbs.ref <- as.data.frame(gridQDS)
     sbs.ref<-drop_na(sbs.ref,siteID)
-    
+
     sbsM.ref<-as.matrix(sbs.ref[,-1]) # remove siteID and convert to matrix
     colnames(sbsM.ref)<-NULL # remove column names
   }
-  
-  
-  return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
+
+
+  return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
+              "coords"=coords,"species.name"=uN))
 }
 
 
 
-sbeFun<- function(rastfile,country.shp){
-  
+sbeFun<- function(rastfile,country.shp,res=0.25){
+
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
     # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
@@ -142,22 +163,22 @@ sbeFun<- function(rastfile,country.shp){
   } else { # stop and report if rastfile is not a file path or SpatRaster
     cli::cli_abort(c("{.var rastfile} is not a file path or SpatRaster"))
   }
- 
-  
+
+
   # Crop Bioclimatic variables to extent of of the country's boundary
   env = crop(env, country.shp)
- 
-  gridQDS = rast(country.shp,res=c(0.25,0.25), crs="EPSG:4326")
-  
-  
+
+  gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326")
+
+
   # Transfer values from rastfile data to QDS
-  envQDS<-resample(env,gridQDS) # bilinear interpolation 
+  envQDS<-resample(env,gridQDS) # bilinear interpolation
   envQDS[["siteID"]]<-1:ncell(envQDS)
-  
-  
+
+
   # mask envQDS to the country map
   envQDS<-mask(envQDS,country.shp)
-  
+
   # extract site by environment from the bioQDS layers
   {sitebyEnv <- as.data.frame(envQDS[])
     sitebyEnv <- drop_na(sitebyEnv,siteID)
@@ -185,16 +206,16 @@ sbtFun<-function(tryfile,taxa.sf){
   } else { # stop and report if tryfile is not a file path or dataframe
     cli::cli_abort(c("{.var tryfile} is not a file path or dataframe"))
     }
-  
+
   if(any(!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile))){
     requiredcol<-c("AccSpeciesName","TraitID","TraitName","OrigValueStr")
     missingcol<-requiredcol[!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile)]
     cli::cli_abort(c("{missingcol} is/are not in the {.var tryfile} column "))
   }
-    
+
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$species))
-  
+
   SpeciesbyTrait<-trydata %>%
     # drop rows which contains no trait
     drop_na(TraitID) %>%
@@ -205,11 +226,11 @@ sbtFun<-function(tryfile,taxa.sf){
     #choose the first trait value if there are multiples trait for a species
     summarise(across(OrigValueStr, first), .groups = "drop") %>%
     # reshape to wide format to have specie by trait dataframe
-    pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>% 
+    pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>%
     # select species that are only present in gbif data
-    filter(AccSpeciesName %in% uN) %>% 
+    filter(AccSpeciesName %in% uN) %>%
     # convert species names to row names
-    column_to_rownames(var = "AccSpeciesName") 
+    column_to_rownames(var = "AccSpeciesName")
   # add the rows of the remaining species without traits from TRY
   na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
                                ncol = ncol(SpeciesbyTrait)))
@@ -220,24 +241,24 @@ sbtFun<-function(tryfile,taxa.sf){
     sbtM<-as.matrix(SpeciesbyTrait)
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
-    
+
     traitname<-trydata %>%
       # drop rows which contains no trait
       drop_na(TraitID) %>%
       # select species name, trait and trait value
       select(TraitID,TraitName) %>%
       group_by(TraitID) %>%
-      summarise(across(TraitName, first), .groups = "drop") %>% 
+      summarise(across(TraitName, first), .groups = "drop") %>%
       column_to_rownames("TraitID")
-    #create Trait name to align with the sbt column  
+    #create Trait name to align with the sbt column
     traitname<-traitname[colnames(SpeciesbyTrait),]
     traitname<-data.frame('TraitID'=colnames(SpeciesbyTrait),'TraitName'=traitname)
   return(list("sbt"=sbtM,"traitname"=traitname))
-  
+
 }
 
 
-taxa.sf <- taxaFun('Acacia',600,"indigofera")
+taxa.sf <- taxaFun('Acacia',2000,"indigofera")
 sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
 
 path = "C:/Users/mukht/Documents" #path for worldclim
@@ -245,10 +266,10 @@ path = "C:/Users/mukht/Documents" #path for worldclim
 precdata <- rast('prec_2021-2040.tif')
 
 
-sbe<-sbeFun(rastfile= precdata, country.shp = rsa_country_sf )
+sbe<-sbeFun(rastfile= chelsaA18, country.shp = rsa_country_sf )
 
 try_path<-"33852.txt" # path for trydata
 
-sbt<-sbtFun(tryfile = trytest,taxa.sf = taxa.sf)
+sbt<-sbtFun(tryfile = try33576,taxa.sf = taxa.sf$taxa)
 
 
