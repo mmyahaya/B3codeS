@@ -9,7 +9,7 @@ library(rasterVis)
 library(lubridate)
 rsa_country_sf = st_read("C:/Users/26485613/OneDrive - Stellenbosch University/Downloads/Code_Data/Code_Data/boundary_south_africa_land_geo.shp")
 # "C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp"
-# add reference and get it sbs
+
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
   # download taxa if scientific name is given
@@ -92,11 +92,11 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
 # Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
 #  write.csv(taxa.sf,"taxa.sf.csv",row.names = FALSE)
 #add res
-sbsFun <- function(taxa.sf,country.shp,res=0.25){
+sbsFun <- function(taxa.sf,country.sf,res=0.25){
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$taxa$species))
   # Create grid cells with extent of country shapefile and layers for siteID and species
-  gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326",nlyrs=length(uN)+1)
+  gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326",nlyrs=length(uN)+1)
   # specify name for each layers of site ID and individual species
   names(gridQDS)<-c("siteID",uN)
   # Assign ID for each cell
@@ -113,7 +113,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
     gridQDS[[n]] <- speciesQDS[]
   }
  # mask grid cells to country shape file
-  gridQDS = mask(gridQDS, country.shp)
+  gridQDS = mask(gridQDS, country.sf)
 
   # create data frame of site by species
   sbs <- as.data.frame(gridQDS)
@@ -134,7 +134,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
     # extract unique species name from GBIF occurrence data
     uN.ref<-sort(unique(taxa.sf$ref$species))
     # Create grid cells with extent of country shapefile and layers for siteID and species
-    gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326",
+    gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326",
                    nlyrs=length(uN.ref)+1)
     # specify name for each layers of site ID and individual species
     names(gridQDS)<-c("siteID",uN.ref)
@@ -152,7 +152,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
       gridQDS[[n]] <- speciesQDS[]
     }
     # mask grid cells to country shape file
-    gridQDS = mask(gridQDS, country.shp)
+    gridQDS = mask(gridQDS, country.sf)
 
     # create data frame of site by species
     sbs.ref <- as.data.frame(gridQDS)
@@ -169,7 +169,7 @@ sbsFun <- function(taxa.sf,country.shp,res=0.25){
 
 
 
-sbeFun<- function(rastfile,country.shp,res=0.25){
+sbeFun<- function(rastfile,country.sf,res=0.25){
 
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
@@ -185,9 +185,9 @@ sbeFun<- function(rastfile,country.shp,res=0.25){
 
 
   # Crop Bioclimatic variables to extent of of the country's boundary
-  env = crop(env, country.shp)
+  env = crop(env, country.sf)
 
-  gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326")
+  gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
 
 
   # Transfer values from rastfile data to QDS
@@ -196,7 +196,7 @@ sbeFun<- function(rastfile,country.shp,res=0.25){
 
 
   # mask envQDS to the country map
-  envQDS<-mask(envQDS,country.shp)
+  envQDS<-mask(envQDS,country.sf)
 
   # extract site by environment from the bioQDS layers
   {sitebyEnv <- as.data.frame(envQDS[])
@@ -278,4 +278,15 @@ sbtFun<-function(tryfile,taxa.sf){
 
 }
 
+dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
+                   res=0.25,tryfile,rastfile){
+  taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
+  sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
+  sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf$taxa)
+  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res)
+  return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
+}
 
+
+datalist<-dataGEN(taxa=taxa_df,country.sf=rsa_country_sf,ref=ref.data1,
+                  tryfile=try33852,rastfile=precdata)
