@@ -1,6 +1,14 @@
 
 
-
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(rgbif) # for occ_download
+library(terra)
+library(sf)
+library(rtry) # for processing try data
+library(rasterVis)
+library(lubridate)
 
 ##### gbif data ####
 taxa = 'Acacia' # scientific name
@@ -50,7 +58,7 @@ system.time(for(n in uN){
 # Mask the grid cell to country shape file
 
 gridQDS = mask(gridQDS, rsa_country_sf)
-#plot(gridQDS[[6]])
+#plot(gridQDS[[21:40]])
 #lines(rsa_country_sf['Land'])
 
 # create data frame of site by species
@@ -66,7 +74,6 @@ taxa.sf <- taxa.sf %>%
   mutate(period = case_when(
     year == 2024 ~ 1,
     year == 2023  ~ 2,
-    
     year == 2022  ~ 3,
     year == 2021 ~ 4,
     year == 2020  ~ 5,
@@ -275,3 +282,8 @@ length(base::setdiff(unique(taxa.df$species),uN))
 plot(gridQDS[[uN[24]]])
 plot(dplyr::filter(taxa.sf, species==uN[24]),add=T)
 lines(rsa_country_sf['Land'])
+
+
+path = "C:/Users/mukht/Documents" #path for worldclim
+
+precdata <- terra::rast('prec_2021-2040.tif')
