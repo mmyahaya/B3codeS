@@ -11,33 +11,31 @@ rsa_country_sf = st_read("C:/Users/26485613/OneDrive - Stellenbosch University/D
 # "C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp"
 # add reference and get it sbs
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
-  # if(length(country)==2){
-  #   country<-country
-  # } else if(is.null(country)){
-  #   country<-country
-  # } else if
+  
   # download taxa if scientific name is given
   if("character" %in% class(taxa)){
     taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
-                                  country='ZA',
+                                  country=country,
                                   hasCoordinate=TRUE,
                                   hasGeospatialIssue=FALSE,
                                   limit = limit)
 
     taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
   } else if("data.frame" %in% class(taxa)){
+    if(any(!c("decimalLatitude","decimalLongitude",
+              "species","dateIdentified") %in% colnames(taxa))){
+      requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
+      missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","dateIdentified") %in% colnames(taxa)]
+      cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column ", 
+                      "x" = "{.var taxa} should be a data of GBIF format "))
+    }
+    
     taxa.df<-taxa
   } else { # stop and report if taxa is not a scientific name or dataframe
-    cli::cli_abort(c("{.var taxa} is not a scientific name or dataframe"))
+    cli::cli_abort(c("{.var taxa} is not a character or dataframe"))
   }
 
-  if(any(!c("decimalLatitude","decimalLongitude",
-            "species","dateIdentified") %in% colnames(taxa))){
-    requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
-    missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","dateIdentified") %in% colnames(tryfile)]
-    cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column "))
-  }
-
+  
   taxa.df = taxa.df %>%
     dplyr::select(decimalLatitude,decimalLongitude,
                   species,dateIdentified) %>% #select occurrence data
@@ -45,23 +43,44 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
     mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
   taxa.sf<-st_as_sf(taxa.df,coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326)
-  # download ref taxa if provided
+  # download  or use ref dataframe taxa if provided
   if(!is.null(ref)){
-    ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
-                                 country='ZA',
-                                 hasCoordinate=TRUE,
-                                 hasGeospatialIssue=FALSE,
-                                 limit = limit)
+    if("character" %in% class(ref)){
+      ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
+                                   country='ZA',
+                                   hasCoordinate=TRUE,
+                                   hasGeospatialIssue=FALSE,
+                                   limit = limit)
+      
+      ref.df = as.data.frame(ref.gbif_download$data)
+      
+      ref.df = ref.df %>%
+        dplyr::select(decimalLatitude,decimalLongitude,
+                      species,dateIdentified) %>% #select occurrence data
+        filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+        mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
+      ref.sf<-st_as_sf(ref.df,coords = c("decimalLongitude", "decimalLatitude"),
+                       crs = 4326)
+    } else if("data.frame" %in% class(ref)){
+      if(any(!c("decimalLatitude","decimalLongitude",
+                "species","dateIdentified") %in% colnames(ref))){
+        requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
+        missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","dateIdentified") %in% colnames(ref)]
+        cli::cli_abort(c("{missingcol} is/are not in the {.var ref} column ", 
+                         "x" = "{.var ref} should be a data of GBIF format "))
+      }
+      ref = ref %>%
+        dplyr::select(decimalLatitude,decimalLongitude,
+                      species,dateIdentified) %>% #select occurrence data
+        filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+        mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
+      ref.sf<-st_as_sf(ref,coords = c("decimalLongitude", "decimalLatitude"),
+                       crs = 4326)
+      
+      } else { # stop and report if taxa is not a scientific name or dataframe
+        cli::cli_abort(c("{.var ref} is not a character or dataframe"))
+      }
 
-    ref.df = as.data.frame(ref.gbif_download$data)
-
-    ref.df = ref.df %>%
-      dplyr::select(decimalLatitude,decimalLongitude,
-                    species,dateIdentified) %>% #select occurrence data
-      filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
-      mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
-    ref.sf<-st_as_sf(ref.df,coords = c("decimalLongitude", "decimalLatitude"),
-                     crs = 4326)
   } else {
     ref.sf=taxa.sf
   }
@@ -202,17 +221,19 @@ sbtFun<-function(tryfile,taxa.sf){
       showOverview = TRUE
     )
   } else if("data.frame" %in% class(tryfile)){
+    if(any(!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile))){
+      requiredcol<-c("AccSpeciesName","TraitID","TraitName","OrigValueStr")
+      missingcol<-requiredcol[!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile)]
+      cli::cli_abort(c("{missingcol} is/are not in the {.var tryfile} column "))
+    }
+    
+    
     trydata<-tryfile
   } else { # stop and report if tryfile is not a file path or dataframe
     cli::cli_abort(c("{.var tryfile} is not a file path or dataframe"))
     }
 
-  if(any(!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile))){
-    requiredcol<-c("AccSpeciesName","TraitID","TraitName","OrigValueStr")
-    missingcol<-requiredcol[!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile)]
-    cli::cli_abort(c("{missingcol} is/are not in the {.var tryfile} column "))
-  }
-
+ 
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$species))
 
@@ -256,20 +277,5 @@ sbtFun<-function(tryfile,taxa.sf){
   return(list("sbt"=sbtM,"traitname"=traitname))
 
 }
-
-
-taxa.sf <- taxaFun('Acacia',2000,"indigofera")
-sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
-
-path = "C:/Users/mukht/Documents" #path for worldclim
-
-precdata <- rast('prec_2021-2040.tif')
-
-
-sbe<-sbeFun(rastfile= chelsaA18, country.shp = rsa_country_sf )
-
-try_path<-"33852.txt" # path for trydata
-
-sbt<-sbtFun(tryfile = try33576,taxa.sf = taxa.sf$taxa)
 
 
