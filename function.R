@@ -25,6 +25,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL){
     mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
   taxa.sf<-st_as_sf(taxa.df,coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326)
+  # download ref taxa if provided
   if(!is.null(ref)){
     ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
                                  country='ZA',
@@ -52,26 +53,26 @@ taxaFun <- function(taxa,limit=500, ref=NULL){
 # Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
 #  write.csv(taxa.sf,"taxa.sf.csv",row.names = FALSE)
 #add res
-sbsFun <- function(taxa.sf,country.shp){
+sbsFun <- function(taxa.sf,country.shp,res=0.25){
   # extract unique species name from GBIF occurrence data
-  uN<-sort(unique(taxa.sf$species))
+  uN<-sort(unique(taxa.sf$taxa$species))
   # Create grid cells with extent of country shapefile and layers for siteID and species
-  gridQDS = rast(country.shp,res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
+  gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326",nlyrs=length(uN)+1)
   # specify name for each layers of site ID and individual species
   names(gridQDS)<-c("siteID",uN)
   # Assign ID for each cell
   gridQDS[["siteID"]]<-1:ncell(gridQDS)
   # create layer for species occurrence in each cell
-  system.time(for(n in uN){
+  for(n in uN){
     # create raster of species
-    speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
+    speciesQDS = rasterize(dplyr::filter(taxa.sf$taxa, species==n),
                            gridQDS,
                            field=1,
                            fun="sum",
                            background = 0)
     # insert occurrence layer for each species to it assigned layer
     gridQDS[[n]] <- speciesQDS[]
-  })
+  }
  # mask grid cells to country shape file
   gridQDS = mask(gridQDS, country.shp)
   
@@ -81,11 +82,49 @@ sbsFun <- function(taxa.sf,country.shp){
   # get coordinates of sites on the country shapefile
   coords <- xyFromCell(gridQDS, sbs$siteID)
   colnames(coords)<-c("Longitude","Latitude")
-  sbsM<-as.matrix(sbs[,-1])
-  colnames(sbsM)<-NULL
+  sbsM<-as.matrix(sbs[,-1]) # remove siteID and convert to matrix
+  colnames(sbsM)<-NULL # remove column names
+  # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
-  return(list("sbs"=sbsM,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
+  
+  # compute sbs for ref if it is different from taxa
+  if(identical(taxa.sf$taxa,taxa.sf$ref)){
+    sbsM.ref<-sbsM
+  } else{
+    # extract unique species name from GBIF occurrence data
+    uN.ref<-sort(unique(taxa.sf$ref$species))
+    # Create grid cells with extent of country shapefile and layers for siteID and species
+    gridQDS = rast(country.shp,res=c(res,res), crs="EPSG:4326",
+                   nlyrs=length(uN.ref)+1)
+    # specify name for each layers of site ID and individual species
+    names(gridQDS)<-c("siteID",uN.ref)
+    # Assign ID for each cell
+    gridQDS[["siteID"]]<-1:ncell(gridQDS)
+    # create layer for species occurrence in each cell
+    for(n in uN.ref){
+      # create raster of species
+      speciesQDS = rasterize(dplyr::filter(taxa.sf$ref, species==n),
+                             gridQDS,
+                             field=1,
+                             fun="sum",
+                             background = 0)
+      # insert occurrence layer for each species to it assigned layer
+      gridQDS[[n]] <- speciesQDS[]
+    }
+    # mask grid cells to country shape file
+    gridQDS = mask(gridQDS, country.shp)
+    
+    # create data frame of site by species
+    sbs.ref <- as.data.frame(gridQDS)
+    sbs.ref<-drop_na(sbs.ref,siteID)
+    
+    sbsM.ref<-as.matrix(sbs.ref[,-1]) # remove siteID and convert to matrix
+    colnames(sbsM.ref)<-NULL # remove column names
+  }
+  
+  
+  return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,"coords"=coords,"species.name"=uN))
 }
 
 
@@ -198,7 +237,7 @@ sbtFun<-function(tryfile,taxa.sf){
 }
 
 
-taxa.sf <- taxaFun('indigofera',600)
+taxa.sf <- taxaFun('Acacia',600,"indigofera")
 sbs<-sbsFun(taxa.sf = taxa.sf, country.shp = rsa_country_sf)
 
 path = "C:/Users/mukht/Documents" #path for worldclim
