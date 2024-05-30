@@ -15,32 +15,8 @@
 #taxa_indi<-readr::read_csv("taxa_Indigofera.csv")
 #trydata see ?rtry_import for Usage
 #rsa_country_sf<- st_read()
-datalist<-dataGEN(taxa=taxa_Acaia,limit=500,country.sf=rsa_sf,ref=taxa_Indigofera,
+datalist<-dataGEN(taxa=taxa_Acaia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
                   tryfile=trydata,rastfile=precdata)
-
-
-
-
-
-
-path = "C:/Users/mukht/Documents" #path for worldclim
-
-precdata <- rast('prec_2021-2040.tif')
-
-
-sbe<-sbeFun(rastfile= chelsaA18, country.shp = rsa_country_sf )
-
-try_path<-"33852.txt" # path for trydata
-
-sbt<-sbtFun(tryfile = try33852,taxa.sf = taxa.sf$taxa)
-
-
-
-northEU<-st_read("C:/Users/mukht/Downloads/world-administrative-boundaries/world-administrative-boundaries.shp")
-
-
-
-ZAsf<-filter(northEU,name=="South Africa") %>% select(name,geometry)
 
 
 

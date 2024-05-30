@@ -11,13 +11,13 @@ library(rasterVis)
 library(lubridate)
 
 ##### gbif data ####
-taxa = 'Indigofera' # scientific name
+taxa = 'Acacia' # scientific name
 
 gbif_download = occ_data(scientificName=taxa, # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 3000)
+                         limit = 2000)
 
 taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
 
@@ -33,7 +33,7 @@ taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
 
 #### Site by Species #####
 # extract unique species name from GBIF occurrence data
-uN<-sort(unique(taxa.sf$taxa$species))
+uN<-sort(unique(taxa.sf$species))
 # Read RSA land area shapefile
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
@@ -58,7 +58,7 @@ system.time(for(n in uN){
 # Mask the grid cell to country shape file
 
 gridQDS = mask(gridQDS, rsa_country_sf)
-#plot(gridQDS[[21:40]])
+#plot(gridQDS[[1:6]])
 #lines(rsa_country_sf['Land'])
 
 # create data frame of site by species
@@ -240,44 +240,9 @@ dataGEN = function(arg1,TaxaName..){
 }
 
 
-r <- rast(ext(taxa.sf),nrows=4, ncols=3, nlyrs=3)
-# Assign unique IDs to each cell
-names(r)<- c("ID","sp1","sp2")
-r$ID <- 1:ncell(r)
-r$sp1<-data.frame(rfield)
-r$sp2<-rbinom(12,1,0.3)
-names(gridQDS)[1:10]
-
-r[]
-# Print the raster to see the unique IDs
-print(r)
-plot(r$sp1)
-plot(sp1, add=T)
-# Get coordinates of each cell
-coords <- raster::xyFromCell(r,c(1,4,5,11))
 
 
 
 
 
 
-chelsaA18 <- terra::rast('CHELSA_swb_2018_V.2.1.tif')
-plot(chelsaA18)
-chelsa.SA<-crop(chelsaA18,ext(taxa.sf))
-plot(chelsa.SA)
-chelsa.SA[]
-envSA<-rasterize(chelsa.SA, #ERROR
-                 gridQDS,
-                 field=1,
-                 fun=mean,
-                 background = 0)
-
-
-
-df <- apply(taxa.df,2,as.character)
-sbt<-apply(sbt1,2,as.numeric)
-# Remove columns where all values are NA
-sbt <- sbt[, colSums(is.na(sbt)) != nrow(sbt)]
-path = "C:/Users/mukht/Documents" #path for worldclim
-
-precdata <- terra::rast('prec_2021-2040.tif')
