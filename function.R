@@ -7,12 +7,10 @@ library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
 library(lubridate)
-rsa_country_sf = st_read("C:/Users/26485613/OneDrive - Stellenbosch University/Downloads/Code_Data/Code_Data/boundary_south_africa_land_geo.shp")
-# "C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp"
 
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
-  # download taxa if scientific name is given
+  # download taxa (target taxa) if the scientific name is given as character
   if("character" %in% class(taxa)){
     taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
                                   country=country,
@@ -21,7 +19,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
                                   limit = limit)
 
     taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
-  } else if("data.frame" %in% class(taxa)){
+  } else if("data.frame" %in% class(taxa)){ #check if data fame contains the required colums
     if(any(!c("decimalLatitude","decimalLongitude",
               "species","dateIdentified") %in% colnames(taxa))){
       requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
@@ -29,7 +27,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
       cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column ", 
                       "x" = "{.var taxa} should be a data of GBIF format "))
     }
-    
+    # take taxa data fram if accurate
     taxa.df<-taxa
   } else { # stop and report if taxa is not a scientific name or dataframe
     cli::cli_abort(c("{.var taxa} is not a character or dataframe"))
@@ -43,7 +41,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
     mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
   taxa.sf<-st_as_sf(taxa.df,coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326)
-  # download  or use ref dataframe taxa if provided
+  # download reference taxa if provided or use the target taxa if otherwise
   if(!is.null(ref)){
     if("character" %in% class(ref)){
       ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
@@ -61,7 +59,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
         mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
       ref.sf<-st_as_sf(ref.df,coords = c("decimalLongitude", "decimalLatitude"),
                        crs = 4326)
-    } else if("data.frame" %in% class(ref)){
+    } else if("data.frame" %in% class(ref)){ # check columns of ref if provided
       if(any(!c("decimalLatitude","decimalLongitude",
                 "species","dateIdentified") %in% colnames(ref))){
         requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
@@ -89,15 +87,13 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   return(list("taxa"=taxa.sf,"ref"=ref.sf))
 }
 
-# Save taxa.sf to drive to avoid redownloading same taxa with same limit next time
-#  write.csv(taxa.sf,"taxa.sf.csv",row.names = FALSE)
-#add res
+# Specie by site
 sbsFun <- function(taxa.sf,country.sf,res=0.25){
   # extract unique species name from GBIF occurrence data
   uN<-sort(unique(taxa.sf$taxa$species))
   # Create grid cells with extent of country shapefile and layers for siteID and species
   gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326",nlyrs=length(uN)+1)
-  # specify name for each layers of site ID and individual species
+  # specify name for each layers for site ID and species
   names(gridQDS)<-c("siteID",uN)
   # Assign ID for each cell
   gridQDS[["siteID"]]<-1:ncell(gridQDS)
@@ -168,7 +164,7 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 }
 
 
-
+#specie by environment
 sbeFun<- function(rastfile,country.sf,res=0.25){
 
   # read the rastfile if path is given
@@ -198,7 +194,7 @@ sbeFun<- function(rastfile,country.sf,res=0.25){
   # mask envQDS to the country map
   envQDS<-mask(envQDS,country.sf)
 
-  # extract site by environment from the bioQDS layers
+  # extract site by environment from the QDS layers
   {sitebyEnv <- as.data.frame(envQDS[])
     sitebyEnv <- drop_na(sitebyEnv,siteID)
     sbeM<-as.matrix(dplyr::select(sitebyEnv, !siteID))
@@ -209,7 +205,7 @@ sbeFun<- function(rastfile,country.sf,res=0.25){
 
 
 
-
+#species by trait
 sbtFun<-function(tryfile,taxa.sf){
   # read the try data if path is given
   if("character" %in% class(tryfile)){
@@ -220,7 +216,7 @@ sbtFun<-function(tryfile,taxa.sf){
       quote = "",
       showOverview = TRUE
     )
-  } else if("data.frame" %in% class(tryfile)){
+  } else if("data.frame" %in% class(tryfile)){ #Check if tryfile contains necessary columns
     if(any(!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile))){
       requiredcol<-c("AccSpeciesName","TraitID","TraitName","OrigValueStr")
       missingcol<-requiredcol[!c("AccSpeciesName","TraitID","TraitName","OrigValueStr") %in% colnames(tryfile)]
@@ -241,7 +237,7 @@ sbtFun<-function(tryfile,taxa.sf){
     # drop rows which contains no trait
     drop_na(TraitID) %>%
     # select species name, trait and trait value
-    select(AccSpeciesName,TraitID,TraitName,OrigValueStr) %>%
+    select(AccSpeciesName,TraitID,OrigValueStr) %>%
     #group by Species and trait
     group_by(AccSpeciesName,TraitID) %>%
     #choose the first trait value if there are multiples trait for a species
@@ -258,15 +254,20 @@ sbtFun<-function(tryfile,taxa.sf){
     row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
     names(na.df)<-names(SpeciesbyTrait) # column names
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
-    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
+    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),] #sort by rownames
     sbtM<-as.matrix(SpeciesbyTrait)
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
-
+    # convert columns of categorical traits to NA
+    sbtM<-suppressWarnings(apply(sbtM,2,as.numeric))
+    # remove columns where all values are NA 
+    sbtM <- sbtM[, colSums(is.na(sbtM)) != nrow(sbtM)]
+    
+    #extract the trait names
     traitname<-trydata %>%
       # drop rows which contains no trait
       drop_na(TraitID) %>%
-      # select species name, trait and trait value
+      # select the trait ID and trait name
       select(TraitID,TraitName) %>%
       group_by(TraitID) %>%
       summarise(across(TraitName, first), .groups = "drop") %>%
@@ -288,5 +289,4 @@ dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
 }
 
 
-datalist<-dataGEN(taxa=taxa_df,country.sf=rsa_country_sf,ref=ref.data1,
-                  tryfile=try33852,rastfile=precdata)
+

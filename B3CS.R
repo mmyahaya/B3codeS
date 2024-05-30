@@ -11,13 +11,13 @@ library(rasterVis)
 library(lubridate)
 
 ##### gbif data ####
-taxa = 'Acacia' # scientific name
+taxa = 'Indigofera' # scientific name
 
 gbif_download = occ_data(scientificName=taxa, # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 17726)
+                         limit = 3000)
 
 taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
 
@@ -275,9 +275,9 @@ envSA<-rasterize(chelsa.SA, #ERROR
 
 
 df <- apply(taxa.df,2,as.character)
-
-
-
+sbt<-apply(sbt1,2,as.numeric)
+# Remove columns where all values are NA
+sbt <- sbt[, colSums(is.na(sbt)) != nrow(sbt)]
 path = "C:/Users/mukht/Documents" #path for worldclim
 
 precdata <- terra::rast('prec_2021-2040.tif')
