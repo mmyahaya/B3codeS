@@ -1,4 +1,11 @@
-taxa.sf <- taxaFun(taxa = taxa_df, ref = ref.data)
+
+# taxa can be specie name or GBIF occurrence data 
+# Limit is number of records to return, 500 is the default.
+# ref can be scientific name or GBIF occurrence data. ref is set to taxa if not provided
+# Country should be 2-letter country code (ISO-3166-1).
+
+
+taxa.sf <- taxaFun(taxa = "Acacia")
 
 
 
