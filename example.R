@@ -12,15 +12,19 @@
 #
 
 #precdata <- rast('prec_2021-2040.tif')
-#taxa_indi<-readr::read_csv("taxa_Indigofera.csv")
+#taxa_Acacia<-read.csv("taxa_Acacia.csv",sep="")
+#taxa_Indigofera<-read.csv("taxa_Indigofera.csv")
 #trydata see ?rtry_import for Usage
 #rsa_country_sf<- st_read()
-datalist<-dataGEN(taxa=taxa_Acaia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
+
+datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
                   tryfile=trydata,rastfile=precdata)
 
 
 
-
+# datalist is nested list.
+# datalist[["sbs"]]$sbs  : site by species
+# datalist[["sbt"]]$traitname ; Name of trait
 
 
 
