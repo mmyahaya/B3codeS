@@ -9,7 +9,7 @@
 # rastfile should be path for storing the worldclim data (see geodata::worldclim_global) or any other raster data of environmental variable
 
 
-#
+
 
 #precdata <- rast('prec_2021-2040.tif')
 #taxa_Acacia<-read.csv("taxa_Acacia.csv",sep="")

@@ -256,12 +256,15 @@ sbtFun<-function(tryfile,taxa.sf){
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
     SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),] #sort by rownames
     sbtM<-as.matrix(SpeciesbyTrait)
-    rownames(sbtM)<-NULL
-    colnames(sbtM)<-NULL
     # convert columns of categorical traits to NA
     sbtM<-suppressWarnings(apply(sbtM,2,as.numeric))
     # remove columns where all values are NA 
     sbtM <- sbtM[, colSums(is.na(sbtM)) != nrow(sbtM)]
+    trait<-colnames(sbtM)
+    #remove column and row names 
+    rownames(sbtM)<-NULL
+    colnames(sbtM)<-NULL
+    
     
     #extract the trait names
     traitname<-trydata %>%
@@ -273,8 +276,8 @@ sbtFun<-function(tryfile,taxa.sf){
       summarise(across(TraitName, first), .groups = "drop") %>%
       column_to_rownames("TraitID")
     #create Trait name to align with the sbt column
-    traitname<-traitname[colnames(SpeciesbyTrait),]
-    traitname<-data.frame('TraitID'=colnames(SpeciesbyTrait),'TraitName'=traitname)
+    traitname<-traitname[trait,]
+    traitname<-data.frame('TraitID'=trait,'TraitName'=traitname)
   return(list("sbt"=sbtM,"traitname"=traitname))
 
 }
