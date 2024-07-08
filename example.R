@@ -22,9 +22,15 @@ datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera
 
 
 
-# datalist is nested list.
+ # datalist is nested list.
 # datalist[["sbs"]]$sbs  : site by species
 # datalist[["sbt"]]$traitname ; Name of trait
 
 
 
+northEU<-st_read("C:/Users/mukht/Downloads/world-administrative-boundaries/world-administrative-boundaries.shp")
+
+
+
+ZAsf<-filter(northEU,name=="South Africa") %>% select(name,geometry)
+Brasf<-filter(northEU,name=="Brazil") %>% select(name,geometry)
