@@ -27,7 +27,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
       cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column ", 
                       "x" = "{.var taxa} should be a data of GBIF format "))
     }
-    # take taxa data fram if accurate
+    # take taxa data frame if accurate
     taxa.df<-taxa
   } else { # stop and report if taxa is not a scientific name or dataframe
     cli::cli_abort(c("{.var taxa} is not a character or dataframe"))

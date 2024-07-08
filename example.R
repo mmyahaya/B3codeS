@@ -18,11 +18,11 @@
 #rsa_country_sf<- st_read()
 
 datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
-                  tryfile=trydata,rastfile=precdata)
+                  tryfile=try33852,rastfile=precdata)
 
 
 
- # datalist is nested list.
+ # datalist is a nested list.
 # datalist[["sbs"]]$sbs  : site by species
 # datalist[["sbt"]]$traitname ; Name of trait
 

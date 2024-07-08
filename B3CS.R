@@ -24,7 +24,7 @@ taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded fi
 
 taxa.occ = taxa.df %>%
   dplyr::select(decimalLatitude,decimalLongitude,
-                species,dateIdentified) %>% #select occurrence data
+                species,dateIdentified,year,month,day) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
 taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
@@ -37,7 +37,7 @@ uN<-sort(unique(taxa.sf$species))
 # Read RSA land area shapefile
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
-
+plot(rsa_country_sf)
 # Create grid cells with extent of the data and layers for siteID and species
 gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
 # specify name for each layers of site ID and individual species
@@ -58,8 +58,8 @@ system.time(for(n in uN){
 # Mask the grid cell to country shape file
 
 gridQDS = mask(gridQDS, rsa_country_sf)
-#plot(gridQDS[[1:6]])
-#lines(rsa_country_sf['Land'])
+plot(gridQDS[[5:10]],col=brewer.pal(5,"OrRd"))
+lines(rsa_country_sf['Land'])
 
 # create data frame of site by species
 sbs <- as.data.frame(gridQDS)
@@ -69,7 +69,7 @@ colnames(sbsM)<-NULL
 ##### speciebyxyt ####
 
 #taxa.sf$day <- yday(taxa.sf$dateIdentified)
-taxa.sf$year<-year(taxa.sf$dateIdentified)
+#taxa.sf$year<-year(taxa.sf$dateIdentified)
 taxa.sf <- taxa.sf %>% 
   mutate(period = case_when(
     year == 2024 ~ 1,
