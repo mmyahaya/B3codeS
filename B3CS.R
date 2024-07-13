@@ -47,7 +47,7 @@ gridQDS[["siteID"]]<-1:ncell(gridQDS)
 # create layer for species occurrence in each cell
 system.time(for(n in uN){
   # create raster of species
-  speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n),
+  speciesQDS = rasterize(dplyr::filter(taxa.sf$taxa, species==n),
                          gridQDS,
                          field=1,
                          fun="sum",
@@ -245,4 +245,14 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
-
+system.time(species_stack <- lapply(uN, function(n) {
+  # Create raster of species occurrences
+  speciesQDS <- rasterize(dplyr::filter(taxa.sf$taxa, species == n), 
+                          gridQDS, field = 1, fun = "sum", background = 0)
+  names(speciesQDS)<-n
+  return(speciesQDS)
+}))
+species_stack
+species_stack <- rast(species_stack)
+gridQDS <- c(gridQDS[["siteID"]], species_stack)
+gridQDS[]
