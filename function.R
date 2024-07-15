@@ -165,13 +165,13 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
 
 #specie by environment
-sbeFun<- function(rastfile,country.sf,res=0.25){
+sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25){
 
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
     # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
     env = geodata::worldclim_global(var='bio',
-                                        res=10, path=rastfile,
+                                        res=2.5, path=rastfile,
                                         version="2.1") # Set your own path directory
   } else if("SpatRaster" %in% class(rastfile)){
     env<-rastfile
@@ -181,18 +181,27 @@ sbeFun<- function(rastfile,country.sf,res=0.25){
 
 
   # Crop Bioclimatic variables to extent of of the country's boundary
-  env = crop(env, country.sf)
-
+  env = crop(env, ext(country.sf))
+  # Extract environmental data for species occurrence point
+  taxa.env.sf = extract(env, taxa.sf$taxa, xy=TRUE, bind=TRUE)
+  
+  # Define grid cell for sites
   gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
-
-
-  # Transfer values from rastfile data to QDS
-  envQDS<-resample(env,gridQDS) # bilinear interpolation
-  envQDS[["siteID"]]<-1:ncell(envQDS)
-
-
+  
+  # Create siteID
+  siteID = gridQDS
+  siteID[] = 1:ncell(gridQDS)
+  names(siteID) = "siteID"
+  
+  # create raster for environmental data
+  envQDS = rasterize(taxa.env.sf,
+                     gridQDS,
+                     field=names(env),
+                     fun=mean,
+                     background = NA)
+  envQDS <- c(siteID,envQDS)
   # mask envQDS to the country map
-  envQDS<-mask(envQDS,country.sf)
+  envQDS <- mask(envQDS, country.sf)
 
   # extract site by environment from the QDS layers
   {sitebyEnv <- as.data.frame(envQDS[])

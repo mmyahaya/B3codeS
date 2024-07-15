@@ -45,19 +45,23 @@ names(gridQDS)<-c("siteID",uN)
 # Assign ID for each cell
 gridQDS[["siteID"]]<-1:ncell(gridQDS)
 # create layer for species occurrence in each cell
-system.time(for(n in uN){
-  # create raster of species
-  speciesQDS = rasterize(dplyr::filter(taxa.sf$taxa, species==n),
-                         gridQDS,
-                         field=1,
-                         fun="sum",
-                         background = 0)
-  # insert occurrence layer for each species to it assigned layer
-  gridQDS[[n]] <- speciesQDS[]
-})
+
+system.time(species_stack <- lapply(uN, function(n) {
+  # Create raster of species occurrences
+  speciesQDS <- rasterize(dplyr::filter(taxa.sf$taxa, species == n), 
+                          gridQDS, field = 1, fun = "sum", background = 0)
+  names(speciesQDS)<-n
+  return(speciesQDS)
+}))
+#convert each species to layers of raster
+species_stack <- rast(species_stack)
+# marge with site ID 
+gridQDS <- c(gridQDS[["siteID"]], species_stack)
+
 # Mask the grid cell to country shape file
 
 gridQDS = mask(gridQDS, rsa_country_sf)
+library(RColorBrewer)
 plot(gridQDS[[5:10]],col=brewer.pal(5,"OrRd"))
 lines(rsa_country_sf['Land'])
 
