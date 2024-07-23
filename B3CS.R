@@ -248,15 +248,122 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
+remotes::install_github('matildabrown/rWCVPdata')
+rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = c("genus"))->A
 
-system.time(species_stack <- lapply(uN, function(n) {
-  # Create raster of species occurrences
-  speciesQDS <- rasterize(dplyr::filter(taxa.sf$taxa, species == n), 
-                          gridQDS, field = 1, fun = "sum", background = 0)
-  names(speciesQDS)<-n
-  return(speciesQDS)
-}))
-species_stack
-species_stack <- rast(species_stack)
-gridQDS <- c(gridQDS[["siteID"]], species_stack)
-gridQDS[]
+rWCVP::wcvp_occ_mat(taxon = "Acacia", taxon_rank = c("genus"))->B
+dplyr::filter(A,taxon_name==uN)->C
+
+pivot_wider(names_from = TraitID, values_from = OrigValueStr) 
+tidyr::pivot_wider(data,names_from ="B", values_froml = "B")
+
+# Add new columns "simple" and "complex"
+data <- data %>%
+  mutate(simple = ifelse(B == "simple", 1, NA),
+         complex = ifelse(B == "complex", 1, NA))
+# Get the unique non-NA values from column B
+unique_values <- na.omit(unique(data$B))
+
+# Create the new columns dynamically
+data_with_new_cols <- data %>%
+  mutate(across(all_of(unique_values), 
+                ~ ifelse(B == cur_column(), 1, NA), 
+                .names = "{col}"))
+
+
+data_with_new_cols <- data %>%
+  mutate(value = 1) %>%  # Create a temporary column with value 1 for pivoting
+  pivot_wider(names_from = B, values_from = value, values_fill = NA)
+
+
+
+
+
+To convert categorical values in columns to new columns (often referred to as one-hot encoding), you can use the dummies package or the fastDummies package, which provide convenient functions for this purpose. Here’s how you can do it using both packages:
+  
+  Using fastDummies Package
+Install and load the fastDummies package.
+Use the dummy_cols function to convert categorical columns to new columns.
+r
+Copy code
+# Install and load the fastDummies package
+install.packages("fastDummies")
+library(fastDummies)
+
+# Create a sample dataframe
+data <- data.frame("A" = 1:5, 
+                   "B" = c("simple", NA, "complex", "simple", NA), 
+                   "C" = factor(c("low", "high", "medium", "medium", "high")))
+
+# Convert categorical columns to new columns
+data_with_dummies <- dummy_cols(data, select_columns = c("B", "C"), remove_first_dummy = FALSE, remove_selected_columns = TRUE)
+
+# View the resulting dataframe
+print(data_with_dummies)
+Using dummies Package
+Install and load the dummies package.
+Use the dummy.data.frame function to convert categorical columns to new columns.
+r
+Copy code
+# Install and load the dummies package
+install.packages("caret")
+library(caret)
+
+# Create a sample dataframe
+data <- data.frame("A" = 1:5, 
+                   "B" = c("simple", NA, "complex", "simple", NA), 
+                   "C" = factor(c("low", "high", "medium", "medium", "high")))
+
+# Convert categorical columns to new columns
+data_with_dummies <- dummy.data.frame(data, names = c("B", "C"), sep = "_")
+
+# View the resulting dataframe
+encoded_data <- data.frame(data, dummyVars(data$B))
+?dummyVars
+
+
+data <- data.frame(
+  A = 1:5, 
+  B = c("simple", NA, "complex", "simple", NA), 
+  C = factor(c("low", "high", "medium", "medium", NA)),
+  D = c("cat", NA, "cat", "dog", "fish"),
+  E = c(1, 2, 3, NA, 5)  # This is a numeric column
+)
+
+replace(data, is.na(data), "NA")
+# Load necessary library
+library(dplyr)
+
+# Create a sample dataframe
+data <- data.frame("A" = 1:5, 
+                   "B" = c("simple", NA, "complex", "simple", NA), 
+                   "C" = factor(c("low", "high", "medium", "medium", "high")))
+
+# Replace NAs in categorical columns with a placeholder (e.g., "NA")
+data <- lapply(data, function(x) if(is.character(x)) replace(x, is.na(x), "NA") else x)
+
+# Identify categorical columns
+categorical_cols <- sapply(data, is.factor) | sapply(data, is.character)
+categorical_cols <- names(categorical_cols[categorical_cols])
+
+# Initialize a list to store dummy variables
+dummy_list <- list()
+
+# Loop through each categorical column and create dummy variables
+for (col in categorical_cols) {
+  # Create dummy variables for the column
+  dummy_matrix <- model.matrix(as.formula(paste("~", col, "- 1")), data)
+  # Add the dummy variables to the list
+  dummy_list[[col]] <- dummy_matrix
+}
+
+# Combine the original dataframe with the dummy variables
+data_with_dummies <- cbind(data, do.call(cbind, dummy_list))
+
+# Optionally remove the original categorical columns
+data_with_dummies <- data_with_dummies %>%
+  select(-all_of(categorical_cols))
+
+# View the resulting dataframe
+print(data_with_dummies)
+
