@@ -246,124 +246,47 @@ dataGEN = function(arg1,TaxaName..){
 
 
 
-
+# World checklist for vascular plants
 
 remotes::install_github('matildabrown/rWCVPdata')
-rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = c("genus"))->A
+library(rWCVP)
+library(rWCVPdata)
 
-rWCVP::wcvp_occ_mat(taxon = "Acacia", taxon_rank = c("genus"))->B
-dplyr::filter(A,taxon_name==uN)->C
-
-pivot_wider(names_from = TraitID, values_from = OrigValueStr) 
-tidyr::pivot_wider(data,names_from ="B", values_froml = "B")
-
-# Add new columns "simple" and "complex"
-data <- data %>%
-  mutate(simple = ifelse(B == "simple", 1, NA),
-         complex = ifelse(B == "complex", 1, NA))
-# Get the unique non-NA values from column B
-unique_values <- na.omit(unique(data$B))
-
-# Create the new columns dynamically
-data_with_new_cols <- data %>%
-  mutate(across(all_of(unique_values), 
-                ~ ifelse(B == cur_column(), 1, NA), 
-                .names = "{col}"))
-
-
-data_with_new_cols <- data %>%
-  mutate(value = 1) %>%  # Create a temporary column with value 1 for pivoting
-  pivot_wider(names_from = B, values_from = value, values_fill = NA)
-
-
-
-
-
-To convert categorical values in columns to new columns (often referred to as one-hot encoding), you can use the dummies package or the fastDummies package, which provide convenient functions for this purpose. Here’s how you can do it using both packages:
+# Download WCVP for acacia within South African area
+AcaciaWCVP <- rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = "genus") %>% 
+  filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa"))
   
-  Using fastDummies Package
-Install and load the fastDummies package.
-Use the dummy_cols function to convert categorical columns to new columns.
-r
-Copy code
-# Install and load the fastDummies package
-install.packages("fastDummies")
-library(fastDummies)
 
-# Create a sample dataframe
-data <- data.frame("A" = 1:5, 
-                   "B" = c("simple", NA, "complex", "simple", NA), 
-                   "C" = factor(c("low", "high", "medium", "medium", "high")))
+# List of my species
+my_Acacia_list<-data.frame( taxon = c("Acacia acinacea", "Acacia adunca", "Acacia baileyana", "Acacia binervata", 
+  "Acacia crassiuscula", "Acacia cultriformis", "Acacia cyclops", 
+  "Acacia dealbata", "Acacia decurrens", "Acacia elata", "Acacia falciformis", 
+  "Acacia implexa", "Acacia longifolia", "Acacia mearnsii", "Acacia melanoxylon", 
+  "Acacia paradoxa", "Acacia piligera", "Acacia podalyriifolia", 
+  "Acacia provincialis", "Acacia pubescens", "Acacia pycnantha", 
+  "Acacia retinodes", "Acacia saligna", "Acacia schinoides", "Acacia stricta", 
+  "Acacia ulicifolia", "Acacia viscidula"))
 
-# Convert categorical columns to new columns
-data_with_dummies <- dummy_cols(data, select_columns = c("B", "C"), remove_first_dummy = FALSE, remove_selected_columns = TRUE)
-
-# View the resulting dataframe
-print(data_with_dummies)
-Using dummies Package
-Install and load the dummies package.
-Use the dummy.data.frame function to convert categorical columns to new columns.
-r
-Copy code
-# Install and load the dummies package
-install.packages("caret")
-library(caret)
-
-# Create a sample dataframe
-data <- data.frame("A" = 1:5, 
-                   "B" = c("simple", NA, "complex", "simple", NA), 
-                   "C" = factor(c("low", "high", "medium", "medium", "high")))
-
-# Convert categorical columns to new columns
-data_with_dummies <- dummy.data.frame(data, names = c("B", "C"), sep = "_")
-
-# View the resulting dataframe
-encoded_data <- data.frame(data, dummyVars(data$B))
-?dummyVars
+# Check list for my species
+SA_native_list <- AcaciaWCVP %>% 
+  filter((accepted_name %in% uSpecies) & occurrence_type=="native") %>% 
+  select(accepted_name,occurrence_type,area,region)
 
 
-data <- data.frame(
-  A = 1:5, 
-  B = c("simple", NA, "complex", "simple", NA), 
-  C = factor(c("low", "high", "medium", "medium", NA)),
-  D = c("cat", NA, "cat", "dog", "fish"),
-  E = c(1, 2, 3, NA, 5)  # This is a numeric column
-)
+# New dataframe with introduction status
 
-replace(data, is.na(data), "NA")
-# Load necessary library
-library(dplyr)
+my_Acacia_list_status<-
+  
+  my_Acacia_list%>%
+  
+  mutate(introduction_status = ifelse(taxon%in%SA_native_list$accepted_name,
+                                      "native","introduced"))%>%
+  view()
 
-# Create a sample dataframe
-data <- data.frame("A" = 1:5, 
-                   "B" = c("simple", NA, "complex", "simple", NA), 
-                   "C" = factor(c("low", "high", "medium", "medium", "high")))
 
-# Replace NAs in categorical columns with a placeholder (e.g., "NA")
-data <- lapply(data, function(x) if(is.character(x)) replace(x, is.na(x), "NA") else x)
 
-# Identify categorical columns
-categorical_cols <- sapply(data, is.factor) | sapply(data, is.character)
-categorical_cols <- names(categorical_cols[categorical_cols])
 
-# Initialize a list to store dummy variables
-dummy_list <- list()
 
-# Loop through each categorical column and create dummy variables
-for (col in categorical_cols) {
-  # Create dummy variables for the column
-  dummy_matrix <- model.matrix(as.formula(paste("~", col, "- 1")), data)
-  # Add the dummy variables to the list
-  dummy_list[[col]] <- dummy_matrix
-}
 
-# Combine the original dataframe with the dummy variables
-data_with_dummies <- cbind(data, do.call(cbind, dummy_list))
 
-# Optionally remove the original categorical columns
-data_with_dummies <- data_with_dummies %>%
-  select(-all_of(categorical_cols))
-
-# View the resulting dataframe
-print(data_with_dummies)
 
