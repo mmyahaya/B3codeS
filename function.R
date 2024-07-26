@@ -6,7 +6,7 @@ library(terra)
 library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
-library(lubridate)
+
 
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
@@ -113,8 +113,13 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
   # create data frame of site by species
   sbs <- as.data.frame(gridQDS)
-  sbs<-drop_na(sbs,siteID)
-  # get coordinates of sites on the country shapefile
+  # select sites which have occurrences
+  sbs<-sbs[rowSums(sbs[,-1])!=0,]
+  # collect site ID
+  siteID<-sbs$siteID
+  
+  
+  # get coordinates of the occurrence sites
   coords <- terra::xyFromCell(gridQDS, sbs$siteID)
   colnames(coords)<-c("Longitude","Latitude")
   sbsM<-as.matrix(sbs[,-1]) # remove siteID and convert to matrix
@@ -122,7 +127,7 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
   # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
-
+  
   # compute sbs for ref if it is different from taxa
   if(identical(taxa.sf$taxa,taxa.sf$ref)){
     sbsM.ref<-sbsM
@@ -152,7 +157,9 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
     # create data frame of site by species
     sbs.ref <- as.data.frame(gridQDS)
-    sbs.ref<-drop_na(sbs.ref,siteID)
+    # select sites base on taxa occurrence site
+    sbs.ref <- sbs.ref[sbs$siteID,]
+   
 
     sbsM.ref<-as.matrix(sbs.ref[,-1]) # remove siteID and convert to matrix
     colnames(sbsM.ref)<-NULL # remove column names
@@ -160,12 +167,12 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
 
   return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
-              "coords"=coords,"species.name"=uN))
+              "coords"=coords,"species.name"=uN,"siteID"=sbs$siteID))
 }
 
 
 #specie by environment
-sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean"){
+sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean", siteID){
 
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
@@ -187,15 +194,10 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean"){
   # Crop Bioclimatic variables to extent of of the country's boundary
   env = crop(env, ext(country.sf))
   # Extract environmental data for species occurrence point
-  taxa.env.sf = extract(env, taxa.sf$taxa, xy=TRUE, bind=TRUE)
+  taxa.env.sf = extract(env, taxa.sf$taxa, bind=TRUE)
   
   # Define grid cell for sites
   gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
-  
-  # Create siteID
-  siteID = gridQDS
-  siteID[] = 1:ncell(gridQDS)
-  names(siteID) = "siteID"
   
   # create raster for environmental data
   envQDS = rasterize(taxa.env.sf,
@@ -203,16 +205,14 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean"){
                      field=names(env),
                      fun=fun,
                      background = NA)
-  envQDS <- c(siteID,envQDS)
-  # mask envQDS to the country map
-  envQDS <- mask(envQDS, country.sf)
+ 
+
   # extract site by environment from the QDS layers
-  sitebyEnv = as.data.frame(envQDS)
-  
-  sbeM <- sitebyEnv %>% 
-    drop_na(siteID) %>% #drop site off the area
-    filter(rowSums(across(ends_with(as.character(fun))))!= 0) %>% #drop site with no occurrences
-    select(-siteID) # deop siteID column
+  sitebyEnv = as.data.frame(envQDS[])
+  # select occurrence sites
+  sitebyEnv<-sitebyEnv[siteID,]
+  # create species by site matrix and drop siteID
+  sbeM <-as.matrix(sitebyEnv)
   variable.name<-colnames(sbeM)
   colnames(sbeM)<-NULL
   return(list("sbe"=sbeM,"variable.name"=variable.name))
@@ -295,11 +295,12 @@ sbtFun<-function(tryfile,taxa.sf){
 }
 
 dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
-                   res=0.25,tryfile,rastfile){
+                   res=0.25,tryfile,rastfile,fun="mean"){
   taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
   sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
+  siteID <- sbs$siteID
   sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf$taxa)
-  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res)
+  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res,fun=fun)
   return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
 }
 
