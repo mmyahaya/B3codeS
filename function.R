@@ -84,8 +84,6 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   } else {
     ref.sf=taxa.sf
   }
-
-
   return(list("taxa"=taxa.sf,"ref"=ref.sf))
 }
 
@@ -182,11 +180,15 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean", siteID){
     env = geodata::worldclim_global(var='bio',
                                         res=2.5, path=rastfile,
                                         version="2.1")
-    names(env) = c('AnnTemp','DiurRange','Isotherm','TempSeas','MaxTemp','MinTemp','TempRange',
+    names(env) = c('AnnTemp','DiurRange','Isotherm','TempSeas',
+                   
+                   'MaxTemp','MinTemp','TempRange',
                        
                        'MeanTWQ','MeanTDQ','MeanTWaQ','MeanTCQ','AnnPrec',
                        
-                       'PrecWetM','PrecDrM','PrecSeas','PrecWetQ','PrecDrQ','PrecWaQ','PrecCQ')
+                       'PrecWetM','PrecDrM','PrecSeas','PrecWetQ',
+                   
+                   'PrecDrQ','PrecWaQ','PrecCQ')
   } else if("SpatRaster" %in% class(rastfile)){
     env<-rastfile
   } else { # stop and report if rastfile is not a file path or SpatRaster
@@ -271,23 +273,15 @@ sbtFun<-function(tryfile,taxa.sf){
     names(na.df)<-names(SpeciesbyTrait) 
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
     #sort according to unique species vector
-    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
-    taxa<-stringr::word(uN[1],1)
+    SpeciesbyTrait<-SpeciesbyTrait[uN,]
     
     # Download WCVP for native taxa in area of interest
-    native_list <- rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = "genus") %>% 
-      filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa")) %>% 
+    native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>%
+      filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa")) %>%
       filter((accepted_name %in% uN) & occurrence_type=="native")
-    
+
     # create taxa list
-    taxa_list<-data.frame(taxon=c("Acacia acinacea", "Acacia adunca", "Acacia baileyana", "Acacia binervata", 
-                                  "Acacia crassiuscula", "Acacia cultriformis", "Acacia cyclops", 
-                                  "Acacia dealbata", "Acacia decurrens", "Acacia elata", "Acacia falciformis", 
-                                  "Acacia implexa", "Acacia longifolia", "Acacia mearnsii", "Acacia melanoxylon", 
-                                  "Acacia paradoxa", "Acacia piligera", "Acacia podalyriifolia", 
-                                  "Acacia provincialis", "Acacia pubescens", "Acacia pycnantha", 
-                                  "Acacia retinodes", "Acacia saligna", "Acacia schinoides", "Acacia stricta", 
-                                  "Acacia ulicifolia", "Acacia viscidula"))
+    taxa_list<-data.frame(taxon=uN)
 
     # create new dataframe with introduction status
     taxa_list_status<-taxa_list%>%
@@ -299,7 +293,7 @@ sbtFun<-function(tryfile,taxa.sf){
     
     sbtM<-as.matrix(SpeciesbyTrait)
    #collect traitID
-    trait<-colnames(sbtM[,-ncol(sbtM)])
+    trait<-colnames(sbtM[])
     #remove column and row names 
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
@@ -325,17 +319,13 @@ dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
                    res=0.25,tryfile,rastfile,fun="mean"){
   taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
   sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
-  
-  sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf$taxa)
+  sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf)
   siteID <- sbs$siteID
-  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res,
-                fun=fun,siteID = siteID)
+  sbe <- sbeFun(rastfile = rastfile, taxa.sf=taxa.sf, country.sf = country.sf,res = res,
+  fun=fun,siteID = siteID)
   return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
 }
 
-
-datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
-                  tryfile="TRY_Acacia.txt",rastfile=rastpath)
 
 
 
