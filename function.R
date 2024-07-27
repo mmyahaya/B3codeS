@@ -8,7 +8,7 @@ library(rtry) # for processing try data
 library(rasterVis)
 library(rWCVP)
 library(rWCVPdata)
-
+library(stringr)
 
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
@@ -271,17 +271,24 @@ sbtFun<-function(tryfile,taxa.sf){
     names(na.df)<-names(SpeciesbyTrait) 
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
     #sort according to unique species vector
-    SpeciesbyTrait<-SpeciesbyTrait[uN,]
-    
+    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
+    taxa<-stringr::word(uN[1],1)
     
     # Download WCVP for native taxa in area of interest
-    native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>% 
+    native_list <- rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = "genus") %>% 
       filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa")) %>% 
       filter((accepted_name %in% uN) & occurrence_type=="native")
     
     # create taxa list
-    taxa_list<-data.frame(taxon=uN)
-    
+    taxa_list<-data.frame(taxon=c("Acacia acinacea", "Acacia adunca", "Acacia baileyana", "Acacia binervata", 
+                                  "Acacia crassiuscula", "Acacia cultriformis", "Acacia cyclops", 
+                                  "Acacia dealbata", "Acacia decurrens", "Acacia elata", "Acacia falciformis", 
+                                  "Acacia implexa", "Acacia longifolia", "Acacia mearnsii", "Acacia melanoxylon", 
+                                  "Acacia paradoxa", "Acacia piligera", "Acacia podalyriifolia", 
+                                  "Acacia provincialis", "Acacia pubescens", "Acacia pycnantha", 
+                                  "Acacia retinodes", "Acacia saligna", "Acacia schinoides", "Acacia stricta", 
+                                  "Acacia ulicifolia", "Acacia viscidula"))
+
     # create new dataframe with introduction status
     taxa_list_status<-taxa_list%>%
       mutate(introduction_status = ifelse(taxon%in%native_list$accepted_name,
@@ -318,11 +325,17 @@ dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
                    res=0.25,tryfile,rastfile,fun="mean"){
   taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
   sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
-  siteID <- sbs$siteID
+  
   sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf$taxa)
-  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res,fun=fun)
+  siteID <- sbs$siteID
+  sbe <- sbeFun(rastfile = rastfile,country.sf = country.sf,res = res,
+                fun=fun,siteID = siteID)
   return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
 }
+
+
+datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
+                  tryfile="TRY_Acacia.txt",rastfile=rastpath)
 
 
 
