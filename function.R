@@ -6,6 +6,8 @@ library(terra)
 library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
+library(rWCVP)
+library(rWCVPdata)
 
 
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
@@ -219,7 +221,6 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean", siteID){
 }
 
 
-
 #species by trait
 sbtFun<-function(tryfile,taxa.sf){
   # read the try data if path is given
@@ -267,12 +268,31 @@ sbtFun<-function(tryfile,taxa.sf){
   na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
                                ncol = ncol(SpeciesbyTrait)))
     row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
-    names(na.df)<-names(SpeciesbyTrait) # column names
+    names(na.df)<-names(SpeciesbyTrait) 
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
-    SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),] #sort by rownames
+    #sort according to unique species vector
+    SpeciesbyTrait<-SpeciesbyTrait[uN,]
+    
+    
+    # Download WCVP for native taxa in area of interest
+    native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>% 
+      filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa")) %>% 
+      filter((accepted_name %in% uN) & occurrence_type=="native")
+    
+    # create taxa list
+    taxa_list<-data.frame(taxon=uN)
+    
+    # create new dataframe with introduction status
+    taxa_list_status<-taxa_list%>%
+      mutate(introduction_status = ifelse(taxon%in%native_list$accepted_name,
+                                          "native","introduced"))
+    # add introduction status to trait column
+    SpeciesbyTrait$introduction_status<-taxa_list_status$introduction_status
+    
+    
     sbtM<-as.matrix(SpeciesbyTrait)
    #collect traitID
-    trait<-colnames(sbtM)
+    trait<-colnames(sbtM[,-ncol(sbtM)])
     #remove column and row names 
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
@@ -288,8 +308,8 @@ sbtFun<-function(tryfile,taxa.sf){
       summarise(across(TraitName, first), .groups = "drop") %>%
       column_to_rownames("TraitID")
     #create trait name to align with the sbt column
-    traitname<-traitname[trait,]
-    traitname<-data.frame('TraitID'=trait,'TraitName'=traitname)
+    traitname<-c(traitname[trait,],"Introduction status")
+    traitname<-data.frame('TraitID'=c(trait,"Introduction status"),'TraitName'=traitname)
   return(list("sbt"=sbtM,"traitname"=traitname))
 
 }
