@@ -14,7 +14,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
   # download taxa (target taxa) if the scientific name is given as character
   if("character" %in% class(taxa)){
-    rgbif::taxa.gbif_download = occ_data(scientificName=taxa, # download data from gbif
+    taxa.gbif_download = rgbif::occ_data(scientificName=taxa, # download data from gbif
                                   country=country,
                                   hasCoordinate=TRUE,
                                   hasGeospatialIssue=FALSE,
@@ -46,7 +46,7 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   # download reference taxa if provided or use the target taxa if otherwise
   if(!is.null(ref)){
     if("character" %in% class(ref)){
-      ref.gbif_download = occ_data(scientificName=ref, # download data from gbif
+      ref.gbif_download = rgbif::occ_data(scientificName=ref, # download data from gbif
                                    country='ZA',
                                    hasCoordinate=TRUE,
                                    hasGeospatialIssue=FALSE,
@@ -293,7 +293,7 @@ sbtFun<-function(tryfile,taxa.sf){
     
     sbtM<-as.matrix(SpeciesbyTrait)
    #collect traitID
-    trait<-colnames(sbtM[])
+    trait<-colnames(sbtM[,-ncol(sbtM)])
     #remove column and row names 
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
