@@ -265,15 +265,19 @@ sbtFun<-function(tryfile,taxa.sf){
     # select species that are only present in gbif data
     filter(AccSpeciesName %in% uN) %>%
     # convert species names to row names
-    column_to_rownames(var = "AccSpeciesName")
+    column_to_rownames(var = "AccSpeciesName") %>% 
+    # select traits that contain at least a single value
+    select_if(~ !all(is.na(.)))
   # add the rows of the remaining species without traits from TRY
   na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
                                ncol = ncol(SpeciesbyTrait)))
     row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
     names(na.df)<-names(SpeciesbyTrait) 
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
-    #sort according to unique species vector
-    SpeciesbyTrait<-SpeciesbyTrait[uN,]
+    #collect traitID
+    trait<-colnames(SpeciesbyTrait)
+    #sort rows according to unique species list
+    SpeciesbyTrait<-as.data.frame(SpeciesbyTrait[uN,])
     
     # Download WCVP for native taxa in area of interest
     native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>%
@@ -290,10 +294,9 @@ sbtFun<-function(tryfile,taxa.sf){
     # add introduction status to trait column
     SpeciesbyTrait$introduction_status<-taxa_list_status$introduction_status
     
-    
+    # create species by trait matrix
     sbtM<-as.matrix(SpeciesbyTrait)
-   #collect traitID
-    trait<-colnames(sbtM[,-ncol(sbtM)])
+  
     #remove column and row names 
     rownames(sbtM)<-NULL
     colnames(sbtM)<-NULL
