@@ -277,7 +277,7 @@ sbtFun<-function(tryfile,taxa.sf){
     
     # Download WCVP for native taxa in area of interest
     native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>%
-      filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa")) %>%
+      filter(area_code_l3 %in% rWCVP::get_wgsrpd3_codes("South Africa")) %>%
       filter((accepted_name %in% uN) & occurrence_type=="native")
 
     # create taxa list
