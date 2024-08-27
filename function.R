@@ -8,7 +8,7 @@ library(rtry) # for processing try data
 library(rasterVis)
 library(rWCVP)
 library(rWCVPdata)
-library(stringr)
+
 
 taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
@@ -117,7 +117,8 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
   sbs<-sbs[rowSums(sbs[,-1])!=0,]
   # collect site ID
   siteID<-sbs$siteID
-  
+  # collect grid for plot
+  taxaQDS=gridQDS
   
   # get coordinates of the occurrence sites
   coords <- terra::xyFromCell(gridQDS, sbs$siteID)
@@ -127,6 +128,7 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
   # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
+  
   
   # compute sbs for ref if it is different from taxa
   if(identical(taxa.sf$taxa,taxa.sf$ref)){
@@ -167,7 +169,7 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
 
   return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
-              "coords"=coords,"species.name"=uN,"siteID"=sbs$siteID))
+              "coords"=coords,"species.name"=uN,"siteID"=sbs$siteID, "taxaQDS"=taxaQDS[[-1]]))
 }
 
 
@@ -280,7 +282,7 @@ sbtFun<-function(tryfile,taxa.sf){
     SpeciesbyTrait<-as.data.frame(SpeciesbyTrait[uN,])
     
     # Download WCVP for native taxa in area of interest
-    native_list <- rWCVP::wcvp_checklist(taxon = stringr::word(uN[1],1), taxon_rank = "genus") %>%
+    native_list <- rWCVP::wcvp_checklist() %>%
       filter(area_code_l3 %in% rWCVP::get_wgsrpd3_codes("South Africa")) %>%
       filter((accepted_name %in% uN) & occurrence_type=="native")
 
