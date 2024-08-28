@@ -174,7 +174,7 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
 
 #specie by environment
-sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean", siteID){
+sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,siteID){
 
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
@@ -197,22 +197,22 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,fun="mean", siteID){
     cli::cli_abort(c("{.var rastfile} is not a file path or SpatRaster"))
   }
 
-  # Crop Bioclimatic variables to extent of of the country's boundary
+  # Crop environmental variables to extent of of the country's boundary
   env = crop(env, ext(country.sf))
-  # Extract environmental data for species occurrence point
-  taxa.env.sf = extract(env, taxa.sf$taxa, bind=TRUE)
+  # Convert the cropped raster to points, removing NA values
+  env_points <- as.data.frame(env, xy = TRUE, na.rm = TRUE)
   
-  # Define grid cell for sites
+  # Define grid cell for sites and environmental variables
   gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
-  
+  envQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
   # create raster for environmental data
-  envQDS = rasterize(taxa.env.sf,
-                     gridQDS,
-                     field=names(env),
-                     fun=fun,
-                     background = NA)
- 
-
+  for (v in names(env_points[,-c(1,2)])) {
+    idw_model <- gstat::gstat(id = v ,formula = as.formula(paste(v,"~1")), data = env_points,
+                              locations = ~x+y,nmax = 7, set = list(idp = 2))
+    interpolated_raster <- interpolate(gridQDS, idw_model)
+    envQDS=c(envQDS,interpolated_raster[[1]])
+  }
+  envQDS=mask(envQDS,country.sf)
   # extract site by environment from the QDS layers
   sitebyEnv = as.data.frame(envQDS[])
   # select occurrence sites
@@ -321,13 +321,13 @@ sbtFun<-function(tryfile,taxa.sf){
 }
 
 dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
-                   res=0.25,tryfile,rastfile,fun="mean"){
+                   res=0.25,tryfile,rastfile){
   taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
   sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
   sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf)
   siteID <- sbs$siteID
-  sbe <- sbeFun(rastfile = rastfile, taxa.sf=taxa.sf, country.sf = country.sf,res = res,
-  fun=fun,siteID = siteID)
+  sbe <- sbeFun(rastfile = rastfile, taxa.sf=taxa.sf, country.sf = country.sf,
+                res = res,siteID = siteID)
   return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
 }
 

@@ -29,19 +29,19 @@
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
 
-datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,ref=taxa_Indigofera,
-                  tryfile="TRY_Vascular.txt",rastfile=rastpath)
+datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,
+                  tryfile="TRY_Acacia.txt",rastfile=rastpath)
 
-datalist2<-dataGEN(taxa="Trifolium",country.sf=rsa_country_sf,
-                  tryfile="TRY_Vascular.txt",rastfile=rastpath,limit = 2000)
+datalist2<-dataGEN(taxa="Vachellia",country.sf=rsa_country_sf,
+                  tryfile="TRY_All.txt",rastfile=rastpath,limit = 2000)
 
 
  # datalist is a nested list.
 # datalist[["sbs"]]$sbs  : site by species
 # datalist[["sbt"]]$traitname ; Name of trait
 
-taxa.sf<-taxaFun(taxa="Acacia",limit = 500)
+taxa.sf<-taxaFun(taxa=taxa_Acacia)
 sbs <- sbsFun(taxa.sf,rsa_country_sf)
 sbt<-sbtFun("TRY_Acacia.txt",taxa.sf)
-sbe<-sbeFun(rastpath,taxa.sf,rsa_country_sf,siteID = sbs$siteID)
+sbe<-sbeFun(precdata,taxa.sf,rsa_country_sf,siteID = sbs$siteID)
 
