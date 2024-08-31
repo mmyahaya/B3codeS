@@ -11,20 +11,24 @@ library(rasterVis)
 library(lubridate)
 
 ##### gbif data ####
-taxa = 'Acacia' # scientific name
-
-gbif_download = occ_data(scientificName=taxa, # download data from gbif
+taxa = 'Fabaceae' # scientific name
+#Tracheophyta Fabaceae
+gbif_download = occ_data(scientificName=c("Acacia","Vachellia"), # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 2000)
+                         limit = 1000)
 
-taxa.df = as.data.frame(gbif_download$data) #extract data from the downloaded file
+taxa.df1 = as.data.frame(gbif_download[["Acacia"]]$data) |> select(decimalLatitude,decimalLongitude,
+                                                                   species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
+taxa.df2 = as.data.frame(gbif_download[["Vachellia"]]$data) |> select(decimalLatitude,decimalLongitude,
+                                                                     species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
+#extract data from the downloaded file
 
-
+taxa.df=rbind(taxa.df1,taxa.df2)
 taxa.occ = taxa.df %>%
-  dplyr::select(decimalLatitude,decimalLongitude,
-                species,dateIdentified,year,month,day) %>% #select occurrence data
+  dplyr::select(decimalLatitude,decimalLongitude,#"coordinateUncertaintyInMeters"
+                species,coordinateUncertaintyInMeters,dateIdentified,year,month,day) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
 taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
@@ -33,22 +37,22 @@ taxa.sf<-st_as_sf(taxa.occ,coords = c("decimalLongitude", "decimalLatitude"),
 
 #### Site by Species #####
 # extract unique species name from GBIF occurrence data
-uN<-sort(unique(taxa.sf$species))
+specie_list<-sort(unique(taxa.sf$species))
 # Read RSA land area shapefile
 rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
 plot(rsa_country_sf)
 # Create grid cells with extent of the data and layers for siteID and species
-gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(uN)+1)
+gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326",nlyrs=length(specie_list)+1)
 # specify name for each layers of site ID and individual species
-names(gridQDS)<-c("siteID",uN)
+names(gridQDS)<-c("siteID",specie_list)
 # Assign ID for each cell
 gridQDS[["siteID"]]<-1:ncell(gridQDS)
 # create layer for species occurrence in each cell
 
-system.time(species_stack <- lapply(uN, function(n) {
+system.time(species_stack <- lapply(specie_list, function(n) {
   # Create raster of species occurrences
-  speciesQDS <- rasterize(dplyr::filter(taxa.sf$taxa, species == n), 
+  speciesQDS <- rasterize(dplyr::filter(taxa.sf, species == n), 
                           gridQDS, field = 1, fun = "sum", background = 0)
   names(speciesQDS)<-n
   return(speciesQDS)
@@ -62,8 +66,8 @@ gridQDS <- c(gridQDS[["siteID"]], species_stack)
 
 gridQDS = mask(gridQDS, rsa_country_sf)
 library(RColorBrewer)
-plot(gridQDS[[5:10]],col=brewer.pal(5,"OrRd"))
-lines(rsa_country_sf['Land'])
+plot(gridQDS[[20:29]],col=brewer.pal(5,"OrRd"))
+lines(rsa_country_sf)
 
 # create data frame of site by species
 sbs <- as.data.frame(gridQDS)
@@ -89,7 +93,7 @@ taxa.sf <- taxa.sf %>%
 # create an empty list for species by xyt
 Speciesbyxyt <- list() 
 system.time(for (t in sort(unique(taxa.sf$period))) {
-  for(n in uN){
+  for(n in specie_list){
     # create raster of species
     speciesQDS = rasterize(dplyr::filter(taxa.sf, species==n, period==t),
                            gridQDS,
@@ -118,11 +122,11 @@ system.time(for (t in sort(unique(taxa.sf$period))) {
 
 ##### Specie by trait  #####
 # Make the rows
-uniqueName<-data.frame("uN"=uN)
+uniqueName<-data.frame("specie_list"=specie_list)
 
 # get TRY species ID for gbif species data
 speciesID<-inner_join(uniqueName,TryAccSpecies,
-                      by=join_by("uN"=="AccSpeciesName")) %>%
+                      by=join_by("specie_list"=="AccSpeciesName")) %>%
   select(AccSpeciesID)
 
 
@@ -139,7 +143,7 @@ dput(traitID)
 
 
 
-input_path<-"33852.txt"
+input_path<-"TRY_Vascular.txt"
 #"C:/Users/mukht/Downloads/33576.txt"
 #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
 
@@ -164,13 +168,13 @@ SpeciesbyTrait<-try33852 %>%
   # reshape to wide format to have specie by trait dataframe
   pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>% 
   # select species that are only present in gbif data
-  filter(AccSpeciesName %in% uN) %>% 
+  filter(AccSpeciesName %in% specie_list) %>% 
   # convert species names to row names
   column_to_rownames(var = "AccSpeciesName") 
 # add the rows of the remaining species without traits from TRY
-{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
+{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(specie_list,rownames(SpeciesbyTrait))),
                              ncol = ncol(SpeciesbyTrait)))
-  row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
+  row.names(na.df)<-setdiff(specie_list,rownames(SpeciesbyTrait))
   names(na.df)<-names(SpeciesbyTrait) # column names
   SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
   SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
@@ -196,7 +200,7 @@ path = "C:/Users/mukht/Documents"
 
 # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
 bio_10m = geodata::worldclim_global(var='bio',
-                                    res=10, path=path,
+                                    res=2.5, path=path,
                                     version="2.1") # Set your own path directory
 
 # Define 'extent' of boundary
@@ -253,7 +257,7 @@ library(rWCVP)
 library(rWCVPdata)
 
 # Download WCVP for acacia within South African area
-AcaciaWCVP <- rWCVP::wcvp_checklist(taxon = "Acacia", taxon_rank = "genus") %>% 
+AcaciaWCVP <- rWCVP::wcvp_checklist() %>% 
   filter(area_code_l3 %in% get_wgsrpd3_codes("South Africa"))
   
 
@@ -276,17 +280,127 @@ SA_native_list <- AcaciaWCVP %>%
 # New dataframe with introduction status
 
 my_Acacia_list_status<-
-  
   my_Acacia_list%>%
-  
   mutate(introduction_status = ifelse(taxon%in%SA_native_list$accepted_name,
-                                      "native","introduced"))%>%
-  view()
+                                      "native","introduced"))
 
 
 
 
 
+points_in_sea <- taxa.sf[!st_intersects(taxa.sf, rsa_country_sf, sparse = FALSE), ]
+
+
+lines(rsa_country_sf['Land'])
+
+
+confidence_M = eicat_data %>% 
+  mutate(impact_category=substr(impact_category,1,2)) %>% 
+  filter(impact_category!="NA") %>% 
+  select(scientific_name,
+         impact_category,confidence_rating) %>% 
+  mutate(confidence_rating = case_when(
+    confidence_rating %in% c("low","Low") ~ 1,
+    confidence_rating %in% c("medium", "Medium") ~ 2,
+    confidence_rating %in% c("high", "High") ~ 3,
+    TRUE ~ 0  # Default case, if any value falls outside the specified ranges
+  )) %>% 
+  group_by(scientific_name,impact_category) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(confidence_rating, max), .groups = "drop") %>% 
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = impact_category, values_from = confidence_rating) %>% 
+  # select species that are only present in gbif data
+  filter(scientific_name %in% specie_list)
+
+
+category_M = eicat_data %>% 
+  mutate(impact_category=substr(impact_category,1,2)) %>% 
+  filter(impact_category!="NA") %>% 
+  select(scientific_name,
+         impact_category) %>% 
+  mutate(category_value = case_when(
+    impact_category == "DD" ~ 0,
+    impact_category == "MC" ~ 1,
+    impact_category == "MN" ~2,
+    impact_category == "MO" ~3,
+    impact_category == "MR" ~4,
+    impact_category == "MV" ~5,
+    TRUE ~ 0  # Default case, if any value falls outside the specified ranges
+  )) %>% 
+  group_by(scientific_name,impact_category) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(category_value, max), .groups = "drop") %>% 
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = impact_category, values_from = category_value) %>% 
+  # select species that are only present in gbif data
+  filter(scientific_name %in% specie_list)
+
+
+impact_M = eicat_data %>% 
+  mutate(impact_category=substr(impact_category,1,2)) %>% 
+  filter(impact_category!="NA") %>% 
+  select(scientific_name,
+         impact_category,confidence_rating) %>% 
+  mutate(confidence_rating = case_when(
+    confidence_rating %in% c("low","Low") ~ 1,
+    confidence_rating %in% c("medium", "Medium") ~ 2,
+    confidence_rating %in% c("high", "High") ~ 3,
+    TRUE ~ 0  # Default case, if any value falls outside the specified ranges
+  )) %>% 
+  group_by(scientific_name,impact_category) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(confidence_rating, length), .groups = "drop") %>% 
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = impact_category, values_from = confidence_rating) %>% 
+  # select species that are only present in gbif data
+  filter(scientific_name %in% specie_list)
+  
 
 
 
+data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)])
+
+
+taxa.sf<-taxa.sf$taxa %>% 
+  left_join(data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)]),
+            by = c("species" = "name"))
+
+
+
+
+
+gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326")
+# specify name for each layers of site ID and individual species
+
+# create layer for species occurrence in each cell
+
+system.time(species_stack <- lapply(c("introduced","native"), function(n) {
+  # Create raster of species occurrences
+  speciesQDS <- rasterize(dplyr::filter(taxa.sf, introduction_status == n), 
+                          gridQDS, field = 1, fun = "sum", background = NA)
+  names(speciesQDS)<-n
+  return(speciesQDS)
+}))
+#convert each species to layers of raster
+species_stack <- rast(species_stack)
+species_stack$intro_native = species_stack$introduced/species_stack$native
+
+plot(species_stack)
+
+A=as.numeric(A)
+
+gridQDS$lyr.1<-B
+B=as.data.frame(B[])
+B[A,]<-rowSums(sbs$sbs.binary)
+plot(gridQDS[[2]])
+
+
+taxa.sf %>% 
+  filter(coordinateUncertaintyInMeters>250) %>% 
+  nrow()
+
+taxa.sf$coordinateUncertaintyInMeters = taxa.sf$coordinateUncertaintyInMeters/(res*1000)
+uncertaintyDS <- rasterize(taxa.sf, 
+                        gridQDS, field = "coordinateUncertaintyInMeters", fun = mean, background = NA)
+plot(uncertaintyDS)
