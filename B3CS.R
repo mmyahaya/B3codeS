@@ -8,7 +8,7 @@ library(terra)
 library(sf)
 library(rtry) # for processing try data
 library(rasterVis)
-library(lubridate)
+
 
 ##### gbif data ####
 taxa = 'Fabaceae' # scientific name
@@ -17,11 +17,11 @@ gbif_download = occ_data(scientificName=c("Acacia","Vachellia"), # download data
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 1000)
+                         limit = 2000)
 
-taxa.df1 = as.data.frame(gbif_download[["Acacia"]]$data) |> select(decimalLatitude,decimalLongitude,
+taxa.df1 = as.data.frame(gbif_download[["Acacia"]]$data) %>%  dplyr::select(decimalLatitude,decimalLongitude,
                                                                    species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
-taxa.df2 = as.data.frame(gbif_download[["Vachellia"]]$data) |> select(decimalLatitude,decimalLongitude,
+taxa.df2 = as.data.frame(gbif_download[["Vachellia"]]$data) |> dplyr::select(decimalLatitude,decimalLongitude,
                                                                      species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
 #extract data from the downloaded file
 
@@ -294,9 +294,14 @@ points_in_sea <- taxa.sf[!st_intersects(taxa.sf, rsa_country_sf, sparse = FALSE)
 lines(rsa_country_sf['Land'])
 
 
+specie_list= sbs$species.name
+
+# Confidence score for pre cautious country level impact
 confidence_M = eicat_data %>% 
   mutate(impact_category=substr(impact_category,1,2)) %>% 
+  mutate(impact_category=factor(impact_category,levels=c("DD","MC","MN","MO","MR","MV"))) %>% 
   filter(impact_category!="NA") %>% 
+  filter(impact_country=="South Africa") %>% 
   select(scientific_name,
          impact_category,confidence_rating) %>% 
   mutate(confidence_rating = case_when(
@@ -308,34 +313,93 @@ confidence_M = eicat_data %>%
   group_by(scientific_name,impact_category) %>%
   #choose the first trait value if there are multiples trait for a species
   summarise(across(confidence_rating, max), .groups = "drop") %>% 
-  # reshape to wide format to have specie by trait dataframe
+  #reshape to wide format to have specie by trait dataframe
   pivot_wider(names_from = impact_category, values_from = confidence_rating) %>% 
-  # select species that are only present in gbif data
-  filter(scientific_name %in% specie_list)
+  #select species that are only present in gbif data
+  filter(scientific_name %in% specie_list) %>% 
+  #convert species names to row names
+  column_to_rownames(var = "scientific_name") 
+  #add the rows of the remaining species without traits from TRY
+  {na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(specie_list,rownames(confidence_M))),
+                               ncol = ncol(confidence_M)))
+    row.names(na.df)<-setdiff(specie_list,rownames(confidence_M))
+    names(na.df)<-names(confidence_M) # column names
+    confidence_M<-rbind(confidence_M,na.df)
+    confidence_M<-confidence_M[order(rownames(confidence_M)),]
+    cbiM<-as.matrix(confidence_M)
+    #rownames(sbtM)<-NULL
+    #colnames(sbtM)<-NULL
+    }
 
 
 category_M = eicat_data %>% 
   mutate(impact_category=substr(impact_category,1,2)) %>% 
-  filter(impact_category!="NA") %>% 
+  filter(impact_category %in% c("MC","MN","MO","MR","MV")) %>% 
+  #filter(impact_country=="South Africa") %>% 
   select(scientific_name,
          impact_category) %>% 
   mutate(category_value = case_when(
-    impact_category == "DD" ~ 0,
-    impact_category == "MC" ~ 1,
-    impact_category == "MN" ~2,
-    impact_category == "MO" ~3,
-    impact_category == "MR" ~4,
-    impact_category == "MV" ~5,
+    impact_category == "MC" ~ 0,
+    impact_category == "MN" ~1,
+    impact_category == "MO" ~2,
+    impact_category == "MR" ~3,
+    impact_category == "MV" ~4,
     TRUE ~ 0  # Default case, if any value falls outside the specified ranges
   )) %>% 
+  #mutate(impact_category=factor(impact_category,levels=c("MC","MN","MO","MR","MV"))) %>% 
   group_by(scientific_name,impact_category) %>%
   #choose the first trait value if there are multiples trait for a species
-  summarise(across(category_value, max), .groups = "drop") %>% 
+  summarise(across(category_value, first), .groups = "drop") %>% 
   # reshape to wide format to have specie by trait dataframe
   pivot_wider(names_from = impact_category, values_from = category_value) %>% 
   # select species that are only present in gbif data
-  filter(scientific_name %in% specie_list)
+  filter(scientific_name %in% specie_list) %>% 
+  #convert species names to row names
+  column_to_rownames(var = "scientific_name")
+  
+frequency_M
+{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(specie_list,rownames(category_M))),
+                               ncol = ncol(category_M)))
+    row.names(na.df)<-setdiff(specie_list,rownames(category_M))
+    names(na.df)<-names(category_M) # column names
+    category_M<-rbind(category_M,na.df)
+    category_M<-category_M[order(rownames(category_M)),]
+    category_M<-as.matrix(category_M)
+    #rownames(sbtM)<-NULL
+    #colnames(sbtM)<-NULL
+    }
 
+
+frequency_M<-eicat_data %>% 
+  mutate(impact_category=substr(impact_category,1,2)) %>% 
+  filter(impact_category %in% c("MC","MN","MO","MR","MV")) %>% 
+  #filter(impact_country=="South Africa") %>% 
+  select(scientific_name,
+         impact_category) %>% 
+  mutate(category_value = case_when(
+    impact_category == "MC" ~ 0,
+    impact_category == "MN" ~1,
+    impact_category == "MO" ~2,
+    impact_category == "MR" ~3,
+    impact_category == "MV" ~4,
+    TRUE ~ 0  # Default case, if any value falls outside the specified ranges
+  )) %>% 
+  #mutate(impact_category=factor(impact_category,levels=c("MC","MN","MO","MR","MV"))) %>% 
+  group_by(scientific_name,impact_category) %>%
+  #choose the first trait value if there are multiples trait for a species
+  summarise(across(category_value, length), .groups = "drop") %>% 
+  # reshape to wide format to have specie by trait dataframe
+  pivot_wider(names_from = impact_category, values_from = category_value) %>% 
+  # select species that are only present in gbif data
+  filter(scientific_name %in% specie_list) %>% 
+  #convert species names to row names
+  column_to_rownames(var = "scientific_name") %>% 
+  rowwise() %>%
+  mutate(Total = sum(c_across(everything()), na.rm = TRUE))
+
+
+category_Mm<-apply(category_M,1, function(x) max(x,na.rm = T))
+sbs$sbs%*%diag(category_Mm)->impact_score
 
 impact_M = eicat_data %>% 
   mutate(impact_category=substr(impact_category,1,2)) %>% 
@@ -362,7 +426,7 @@ impact_M = eicat_data %>%
 data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)])
 
 
-taxa.sf<-taxa.sf$taxa %>% 
+intro.sf<-taxa.sf$taxa %>% 
   left_join(data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)]),
             by = c("species" = "name"))
 
@@ -377,17 +441,17 @@ gridQDS = rast(rsa_country_sf,res=c(0.25,0.25), crs="EPSG:4326")
 
 system.time(species_stack <- lapply(c("introduced","native"), function(n) {
   # Create raster of species occurrences
-  speciesQDS <- rasterize(dplyr::filter(taxa.sf, introduction_status == n), 
+  speciesQDS <- rasterize(dplyr::filter(intro.sf, introduction_status == n), 
                           gridQDS, field = 1, fun = "sum", background = NA)
   names(speciesQDS)<-n
   return(speciesQDS)
 }))
 #convert each species to layers of raster
 species_stack <- rast(species_stack)
-species_stack$intro_native = species_stack$introduced/species_stack$native
+species_stack$intro_native = sqrt(species_stack$introduced/species_stack$native)
 
 plot(species_stack)
-
+lines(rsa_country_sf['Land'])
 A=as.numeric(A)
 
 gridQDS$lyr.1<-B
@@ -396,11 +460,11 @@ B[A,]<-rowSums(sbs$sbs.binary)
 plot(gridQDS[[2]])
 
 
-taxa.sf %>% 
-  filter(coordinateUncertaintyInMeters>250) %>% 
-  nrow()
+intro.sf <- intro.sf %>% 
+  filter(coordinateUncertaintyInMeters<=250)
 
-taxa.sf$coordinateUncertaintyInMeters = taxa.sf$coordinateUncertaintyInMeters/(res*1000)
-uncertaintyDS <- rasterize(taxa.sf, 
+intro.sf$coordinateUncertaintyInMeters = (intro.sf$coordinateUncertaintyInMeters/(res*1000))^2
+uncertaintyDS <- rasterize(intro.sf, 
                         gridQDS, field = "coordinateUncertaintyInMeters", fun = mean, background = NA)
 plot(uncertaintyDS)
+

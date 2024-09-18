@@ -13,8 +13,7 @@
 #' @rastfile should be path for storing the worldclim data 
 #' (see geodata::worldclim_global) or any other raster data of environmental variable
 
-#' @fun summarises  multiple geometries in one cell of environmental variable. 
-#' for example "min", "max", "mean", "count" and "sum" 
+
 
 
 
@@ -36,12 +35,11 @@ datalist2<-dataGEN(taxa="Vachellia",country.sf=rsa_country_sf,
                   tryfile="TRY_All.txt",rastfile=rastpath,limit = 2000)
 
 
- # datalist is a nested list.
+# datalist is a nested list.
 # datalist[["sbs"]]$sbs  : site by species
 # datalist[["sbt"]]$traitname ; Name of trait
 
-taxa.sf<-taxaFun(taxa=taxa_Acacia)
+taxa.sf<-taxaFun(taxa=Acacia_Vachellia)
 sbs <- sbsFun(taxa.sf,rsa_country_sf)
 sbt<-sbtFun("TRY_Acacia.txt",taxa.sf)
-sbe<-sbeFun(precdata,taxa.sf,rsa_country_sf,siteID = sbs$siteID)
-
+sbe<-sbeFun(path,taxa.sf,rsa_country_sf,siteID = sbs$siteID)

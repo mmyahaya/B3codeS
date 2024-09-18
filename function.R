@@ -10,7 +10,7 @@ library(rWCVP)
 library(rWCVPdata)
 
 
-taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
+taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA',res=0.25){
   
   # download taxa (target taxa) if the scientific name is given as character
   if("character" %in% class(taxa)){
@@ -23,9 +23,9 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
     taxa.df = as.data.frame(taxa.gbif_download$data) #extract data from the downloaded file
   } else if("data.frame" %in% class(taxa)){ #check if data fame contains the required colums
     if(any(!c("decimalLatitude","decimalLongitude",
-              "species","dateIdentified") %in% colnames(taxa))){
-      requiredcol<-c("decimalLatitude","decimalLongitude","species","dateIdentified")
-      missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","dateIdentified") %in% colnames(taxa)]
+              "species","coordinateUncertaintyInMeters","dateIdentified") %in% colnames(taxa))){
+      requiredcol<-c("decimalLatitude","decimalLongitude","species","coordinateUncertaintyInMeters","dateIdentified")
+      missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","coordinateUncertaintyInMeters","dateIdentified") %in% colnames(taxa)]
       cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column ", 
                       "x" = "{.var taxa} should be a data of GBIF format "))
     }
@@ -38,9 +38,11 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
   
   taxa.df = taxa.df %>%
     dplyr::select(decimalLatitude,decimalLongitude,
-                  species,dateIdentified) %>% #select occurrence data
+                  species,coordinateUncertaintyInMeters,dateIdentified) %>% #select occurrence data
     filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
-    mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
+    dplyr::filter(coordinateUncertaintyInMeters<=res*1000) %>% 
+    dplyr::mutate(coordinateUncertaintyInMeters = coordinateUncertaintyInMeters/(res*1000)^2) %>% 
+    dplyr::mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
   taxa.sf<-sf::st_as_sf(taxa.df,coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326)
   # download reference taxa if provided or use the target taxa if otherwise
@@ -56,8 +58,9 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
       
       ref.df = ref.df %>%
         dplyr::select(decimalLatitude,decimalLongitude,
-                      species,dateIdentified) %>% #select occurrence data
+                      species,coordinateUncertaintyInMeters,dateIdentified) %>% #select occurrence data
         filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+        filter(coordinateUncertaintyInMeters<=res*1000) %>% 
         mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
       ref.sf<-sf::st_as_sf(ref.df,coords = c("decimalLongitude", "decimalLatitude"),
                        crs = 4326)
@@ -71,8 +74,9 @@ taxaFun <- function(taxa,limit=500, ref=NULL,country='ZA'){
       }
       ref = ref %>%
         dplyr::select(decimalLatitude,decimalLongitude,
-                      species,dateIdentified) %>% #select occurrence data
+                      species,coordinateUncertaintyInMeters,dateIdentified) %>% #select occurrence data
         filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+        filter(coordinateUncertaintyInMeters<=res*1000) %>%
         mutate(dateIdentified = as.Date(dateIdentified)) # convert date to date format
       ref.sf<-sf::st_as_sf(ref,coords = c("decimalLongitude", "decimalLatitude"),
                        crs = 4326)
@@ -129,6 +133,15 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
   
+  #create site uncertainty
+  site_uncertainty = terra::rasterize(taxa.sf$taxa,
+                                      gridQDS,
+                                      field="coordinateUncertaintyInMeters",
+                                      fun=mean,
+                                      background = 0)
+  
+  site_uncertainty = as.data.frame(site_uncertainty)
+  site_uncertainty = site_uncertainty[siteID,]
   
   # compute sbs for ref if it is different from taxa
   if(identical(taxa.sf$taxa,taxa.sf$ref)){
@@ -169,7 +182,8 @@ sbsFun <- function(taxa.sf,country.sf,res=0.25){
 
 
   return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
-              "coords"=coords,"species.name"=uN,"siteID"=sbs$siteID, "taxaQDS"=taxaQDS[[-1]]))
+              "coords"=coords,"species.name"=uN,
+              "siteID"=sbs$siteID, "taxaQDS"=taxaQDS[[-1]],"site_unc"=site_uncertainty))
 }
 
 
@@ -257,7 +271,7 @@ sbtFun<-function(tryfile,taxa.sf){
     # drop rows which contains no trait
     drop_na(TraitID) %>%
     # select species name, trait and trait value
-    select(AccSpeciesName,TraitID,OrigValueStr) %>%
+    dplyr::select(AccSpeciesName,TraitID,OrigValueStr) %>%
     #group by Species and trait
     group_by(AccSpeciesName,TraitID) %>%
     #choose the first trait value if there are multiples trait for a species
@@ -309,7 +323,7 @@ sbtFun<-function(tryfile,taxa.sf){
       # drop rows which contains no trait
       drop_na(TraitID) %>%
       # select the trait ID and trait name
-      select(TraitID,TraitName) %>%
+      dplyr::select(TraitID,TraitName) %>%
       group_by(TraitID) %>%
       summarise(across(TraitName, first), .groups = "drop") %>%
       column_to_rownames("TraitID")
