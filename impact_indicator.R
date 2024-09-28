@@ -12,19 +12,18 @@ grid <- rsa_country_sf %>%
 taxon.sf = taxa_Fabacae %>%
   dplyr::select(decimalLatitude,decimalLongitude,
                 species,coordinateUncertaintyInMeters,year,speciesKey) %>% #select occurrence data
-  #filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
-  #filter(coordinateUncertaintyInMeters<=res*1000) %>% 
-  filter(!is.na(decimalLatitude)) %>% 
+  dplyr::filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
+  dplyr::filter(coordinateUncertaintyInMeters<=res*1000) %>% 
   sf::st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
                crs = 4326) %>%
   st_join(grid) %>% 
   as.data.frame() %>% 
-  select(-geometry) %>% 
-  mutate(occurrenceStatus=1)
+  dplyr::select(-geometry) %>% 
+  dplyr::mutate(occurrenceStatus=1)
 
 
 
-taxon_cube<-process_cube(taxon.sf,grid_type = "custom",cols_cellCode = "cellid", cols_year = "year",
+taxon_cube<-b3gbi::process_cube(taxon_sf,grid_type = "custom",cols_cellCode = "cellid", cols_year = "year",
                  cols_occurrences = "occurrenceStatus",cols_species = "species",cols_speciesKey = "speciesKey",
                  cols_minCoordinateUncertaintyInMeters = "coordinateUncertaintyInMeters")
 
@@ -36,7 +35,7 @@ list_species(taxon_cube)
 ts_turnover<-occ_turnover_ts(taxon_cube)
 
 plot(ts_turnover)
-ts_density<-occ_density_ts(taxon_cube)
+#ts_density<-occ_density_ts(taxon_cube)
 plot(ts_density)
 
 ts_evenness<-pielou_evenness_ts(taxon_cube)
@@ -44,33 +43,35 @@ ts_evenness<-pielou_evenness_ts(taxon_cube)
 plot(ts_evenness)
 
 sbs.taxon<-taxon_cube$data %>%
-  # select species name, trait and trait value
+  
   dplyr::select(scientificName,cellCode,obs) %>%
-  #group by Species and trait
+  
   group_by(scientificName,cellCode) %>%
-  #choose the first trait value if there are multiples trait for a species
+  
   summarise(across(obs, sum), .groups = "drop") %>%
-  # reshape to wide format to have specie by trait dataframe
+  
   pivot_wider(names_from = scientificName, values_from = obs) %>%
+  
   arrange(cellCode) %>% 
-  # convert species names to row names
+  
   column_to_rownames(var = "cellCode") 
 
 
 species_list<-sort(unique(taxon_cube$data$scientificName))
 
-# Download WCVP for native taxa in area of interest
-native_list <- rWCVP::wcvp_checklist() %>%
-  filter(area_code_l3 %in% rWCVP::get_wgsrpd3_codes("South Africa")) %>%
-  filter((accepted_name %in% species_list) & occurrence_type=="native")
 
-# create taxa list
-taxa_list<-data.frame(taxon=species_list)
+taxon_status_list<-taxon_status(species_list = species_list,
+                                source = "WCVP",
+                                region = "South Africa")
 
-# create new dataframe with introduction status
-taxa_list_status<-taxa_list%>%
-  mutate(introduction_status = ifelse(taxon%in%native_list$accepted_name,
-                                      "native","introduced"))
+
+test_data<-data.frame(name=species_list[1:100],
+                      status=sample(c("introduced","native"),100,replace = T))
+
+taxon_status_list<-taxon_status(species_list = species_list,
+                                source = "manual",
+                                status_data = test_data)
+
 
 
 intro.sf<-taxon_cube$data %>% 
@@ -90,7 +91,7 @@ status.sf <- intro.sf %>%
   arrange(cellCode)
 
 
-intro.sf<-left_join(intro.sf,status.sf, by="cellCode")
+#intro.sf<-left_join(intro.sf,status.sf, by="cellCode")
   
 eicat_impact<-function(eicat_data,
                        species_list,
@@ -142,7 +143,8 @@ eicat_impact<-function(eicat_data,
   
   category_M<-data.frame("fun"=apply(category_M,1,f))
   names(category_M)<-fun
-  na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(species_list,rownames(category_M))),
+  na.df<-as.data.frame(matrix(NA,
+                              nrow = length(setdiff(species_list,rownames(category_M))),
                               ncol = ncol(category_M)))
   row.names(na.df)<-setdiff(species_list,rownames(category_M))
   names(na.df)<-names(category_M) # column names
@@ -156,10 +158,10 @@ eicat_impact<-function(eicat_data,
 eicat_score=eicat_impact(eicat_data = eicat_data,species_list = species_list,
                          fun="max")
 eicat_score
-site_pressure<-status.sf$intro_native
+siteScore<-status.sf$intro_native
 
 abdundance_impact = sweep(sbs.taxon,2,eicat_score,FUN = "*")
-impactScore = site_pressure*abdundance_impact
+impactScore = siteScore*abdundance_impact
 
 
 specieImpact<-colSums(impactScore,na.rm = TRUE)
