@@ -41,26 +41,21 @@ plot(ts_density)
 ts_evenness<-pielou_evenness_ts(taxon_cube)
 
 plot(ts_evenness)
-
+y=2005
 sbs.taxon<-taxon_cube$data %>%
-  
+  filter(year==y) %>% 
   dplyr::select(scientificName,cellCode,obs) %>%
-  
   group_by(scientificName,cellCode) %>%
-  
   summarise(across(obs, sum), .groups = "drop") %>%
-  
   pivot_wider(names_from = scientificName, values_from = obs) %>%
-  
   arrange(cellCode) %>% 
-  
   column_to_rownames(var = "cellCode") 
 
 
-species_list<-sort(unique(taxon_cube$data$scientificName))
+species_list<-unique(names(sbs.taxon))
 
-
-taxon_status_list<-taxon_status(species_list = species_list,
+full_species_list<-sort(unique(taxon_cube$data$scientificName))
+taxon_status_list<-taxon_status(species_list = full_species_list,
                                 source = "WCVP",
                                 region = "South Africa")
 
@@ -75,6 +70,7 @@ taxon_status_list<-taxon_status(species_list = species_list,
 
 
 intro.sf<-taxon_cube$data %>% 
+  filter(year==y) %>% 
   left_join(taxa_list_status,
             by = c("scientificName" = "taxon"))
 
@@ -142,14 +138,17 @@ eicat_impact<-function(eicat_data,
   
   
   category_M<-data.frame("fun"=apply(category_M,1,f))
-  names(category_M)<-fun
+  #names(category_M)<-fun
   na.df<-as.data.frame(matrix(NA,
                               nrow = length(setdiff(species_list,rownames(category_M))),
                               ncol = ncol(category_M)))
   row.names(na.df)<-setdiff(species_list,rownames(category_M))
   names(na.df)<-names(category_M) # column names
   category_M<-rbind(category_M,na.df)
-  category_M<-category_M[order(rownames(category_M)),]
+  category_M <- category_M %>%
+    dplyr::mutate(rowname = row.names(.)) %>%  
+    dplyr::arrange(rowname) %>%               
+    dplyr::select(-rowname)                    
   return(category_M)
     
     
@@ -157,18 +156,18 @@ eicat_impact<-function(eicat_data,
 
 eicat_score=eicat_impact(eicat_data = eicat_data,species_list = species_list,
                          fun="max")
-eicat_score
+eicat<-eicat_score[species_list,]
 siteScore<-status.sf$intro_native
 
-abdundance_impact = sweep(sbs.taxon,2,eicat_score,FUN = "*")
+abdundance_impact = sweep(sbs.taxon,2,eicat,FUN = "*")
 impactScore = siteScore*abdundance_impact
+impact<-sum(impactScore,na.rm = TRUE)
 
-
-specieImpact<-colSums(impactScore,na.rm = TRUE)
-specieImpact<-specieImpact[specieImpact>0]
-
-siteImpact<-rowSums(impactScore,na.rm = TRUE)
-siteImpact<-siteImpact[siteImpact>0]
+# specieImpact<-colSums(impactScore,na.rm = TRUE)
+# specieImpact<-specieImpact[specieImpact>0]
+# 
+# siteImpact<-rowSums(impactScore,na.rm = TRUE)
+# siteImpact<-siteImpact[siteImpact>0]
 
 
 
