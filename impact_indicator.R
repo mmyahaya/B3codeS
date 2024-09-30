@@ -44,9 +44,10 @@ plot(ts_evenness)
 
 period<-sort(unique(taxon_cube$data$year))
 
-impact_list<-as.list(1:length(period[-c(1:12)]))
-names(impact_list)<-as.character(period[-c(1:12)])
-for(y in period[-c(1:12)]){
+sbs.taxon_list<-list()
+names(sbs.taxon_list)<-paste0("year","_",period[-c(1:12)])
+
+sbs.fun<-function(y){
   sbs.taxon<-taxon_cube$data %>%
     filter(year==y) %>% 
     dplyr::select(scientificName,cellCode,obs) %>%
@@ -55,35 +56,43 @@ for(y in period[-c(1:12)]){
     pivot_wider(names_from = scientificName, values_from = obs) %>%
     arrange(cellCode) %>% 
     column_to_rownames(var = "cellCode") 
-  
-  species_list<-unique(names(sbs.taxon))
-  
-  if(!exists("taxon_status_list")){
-    full_species_list<-sort(unique(taxon_cube$data$scientificName))
-    taxon_status_list<-taxon_status(species_list = full_species_list,
-                                    source = "WCVP",
-                                    region = "South Africa")
-  }
-  
-  intro.sf<-taxon_cube$data %>% 
-    filter(year==y) %>% 
-    left_join(taxa_list_status,
-              by = c("scientificName" = "taxon"))
+  return(sbs.taxon)
+}
+
+sbs.taxon_list<-map(period[-c(1:12)],sbs.fun)
+for(y in period[-c(1:12)]){
   
   
-  status.sf <- intro.sf %>%
-    group_by(cellCode) %>%
-    summarise(
-      total_intro_obs = sum(obs[introduction_status == "introduced"], na.rm = TRUE),
-      total_native_obs = sum(obs[introduction_status == "native"], na.rm = TRUE),
-      .groups = "drop"
-    ) %>% 
-    mutate(across(c(total_intro_obs, total_native_obs), ~ ifelse(.==0,NA,.))) %>% 
-    mutate(intro_native=total_intro_obs/total_native_obs) %>% 
-    arrange(cellCode)
-  if (!exists("eicat_score_list")){
-    eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = species_list,
-                                  fun="max")
+  sbs.taxon_list[[paste0("year","_",y)]]<-sbs.taxon
+  # 
+  # species_list<-unique(names(sbs.taxon))
+  # 
+  # if(!exists("taxon_status_list")){
+  #   full_species_list<-sort(unique(taxon_cube$data$scientificName))
+  #   taxon_status_list<-taxon_status(species_list = full_species_list,
+  #                                   source = "WCVP",
+  #                                   region = "South Africa")
+  # }
+  # 
+  # intro.sf<-taxon_cube$data %>% 
+  #   filter(year==y) %>% 
+  #   left_join(taxa_list_status,
+  #             by = c("scientificName" = "taxon"))
+  # 
+  # 
+  # status.sf <- intro.sf %>%
+  #   group_by(cellCode) %>%
+  #   summarise(
+  #     total_intro_obs = sum(obs[introduction_status == "introduced"], na.rm = TRUE),
+  #     total_native_obs = sum(obs[introduction_status == "native"], na.rm = TRUE),
+  #     .groups = "drop"
+  #   ) %>% 
+  #   mutate(across(c(total_intro_obs, total_native_obs), ~ ifelse(.==0,NA,.))) %>% 
+  #   mutate(intro_native=total_intro_obs/total_native_obs) %>% 
+  #   arrange(cellCode)
+  # if (!exists("eicat_score_list")){
+  #   eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = species_list,
+  #                                 fun="max")
   }
  
   eicat_score<-eicat_score_list[species_list,]
