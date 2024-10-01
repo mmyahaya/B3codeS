@@ -22,7 +22,7 @@ my_boot_statistic <- function(data, indices, fun) {
 
 my_fun<-function(x){
   
-  species_list<-names(x)
+  species_list<-colnames(x)
 
   if(!exists("taxon_status_list")){
     full_species_list<-sort(unique(taxon_cube$data$scientificName))
@@ -30,9 +30,11 @@ my_fun<-function(x){
                                     source = "WCVP",
                                     region = "South Africa")
   }
+  
+  
 
   intro.sf<-taxon_cube$data %>%
-    filter(year==y) %>%
+    filter(year==2000) %>%
     left_join(taxa_list_status,
               by = c("scientificName" = "taxon"))
 
@@ -48,14 +50,15 @@ my_fun<-function(x){
     mutate(intro_native=total_intro_obs/total_native_obs) %>%
     arrange(cellCode)
   if (!exists("eicat_score_list")){
-    eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = species_list,
+    full_species_list<-sort(unique(taxon_cube$data$scientificName))
+    eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = full_species_list,
                                   fun="max")
   }
   
   eicat_score<-eicat_score_list[species_list,]
   
   siteScore<-status.sf$intro_native
-  abdundance_impact = sweep(sbs.taxon,2,eicat_score,FUN = "*")
+  abdundance_impact = sweep(as.matrix(x),2,eicat_score,FUN = "*")
   impactScore = siteScore*abdundance_impact
   impact<-sum(impactScore,na.rm = TRUE) 
   
@@ -64,10 +67,10 @@ my_fun<-function(x){
   # if (is.nan(m)) {
   #   m <- NA
   # }
-   return(impact)
+   return(indices)
 }
 
-sbs.taxon_list<-map(period[-c(1:12)],sbs.fun)
+#sbs.taxon_list<-map(period[-c(1:12)],sbs.fun)
 
 
 
@@ -83,3 +86,6 @@ bootstrap_list <- map(period[-c(1:12)],sbs.fun) %>%
     R = samples,
     fun = fun))
 bootstrap_list
+
+sweep(as.matrix(sbs.taxon_list[[2]]), 2, NA, FUN = "*")
+
