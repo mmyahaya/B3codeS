@@ -51,7 +51,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
     dplyr::mutate(dateIdentified = as.Date(dateIdentified)) %>%  # convert date to date format
     sf::st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
                     crs = 4326) %>% 
-    st_join(grid) %>% 
+    sf::st_join(grid) %>% 
     as.data.frame() %>% 
     dplyr::select(-geometry) %>% 
     dplyr::mutate(occurrenceStatus=1)
@@ -81,7 +81,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
         dplyr::mutate(dateIdentified = as.Date(dateIdentified)) %>% # convert date to date format
         sf::st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
                        crs = 4326) %>% 
-        st_join(grid) %>% 
+        sf::st_join(grid) %>% 
         as.data.frame() %>% 
         dplyr::select(-geometry) %>% 
         dplyr::mutate(occurrenceStatus=1)
@@ -108,7 +108,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
         dplyr::mutate(dateIdentified = as.Date(dateIdentified)) %>% # convert date to date format
         sf::st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
                        crs = 4326) %>% 
-        st_join(grid) %>% 
+        sf::st_join(grid) %>% 
         as.data.frame() %>% 
         dplyr::select(-geometry) %>% 
         dplyr::mutate(occurrenceStatus=1)
@@ -132,7 +132,8 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
 }
 
 # Specie by site
-sbsFun <- function(taxa_cube){
+sbsFun <- function(taxa_cube,country.sf,res){
+
   # extract unique species name from GBIF occurrence data
   species_list<-sort(unique(taxa_cube$taxa$data$scientificName))
   
@@ -141,11 +142,17 @@ sbsFun <- function(taxa_cube){
     dplyr::group_by(scientificName,cellCode) %>%
     dplyr::summarise(across(obs, sum), .groups = "drop") %>%
     tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
-    dplyr:: arrange(cellCode) %>% 
+    dplyr::arrange(cellCode) %>% 
     tibble::column_to_rownames(var = "cellCode") %>% 
     as.matrix()
-
   
+  #create grid for region
+  grid <- country.sf %>%
+    sf::st_make_grid(cellsize = c(res,res),
+                     offset = c(sf::st_bbox(country.sf)$xmin,
+                                sf::st_bbox(country.sf)$ymin)) %>%
+    sf::st_sf() %>%
+    dplyr::mutate(cellid = dplyr::row_number())
   
   # get coordinates of the occurrence sites
   coords <- sf::st_coordinates(sf::st_centroid(grid))
@@ -159,8 +166,8 @@ sbsFun <- function(taxa_cube){
   
   #create site uncertainty
   site_uncertainty <- taxa_cube$taxa$data %>% 
-    select(all_of(c("cellCode","minCoordinateUncertaintyInMeters"))) %>% 
-    group_by(cellCode) %>% 
+    dplyr::select(all_of(c("cellCode","minCoordinateUncertaintyInMeters"))) %>% 
+    dplyr::group_by(cellCode) %>% 
     dplyr::summarise(across(minCoordinateUncertaintyInMeters, sum), .groups = "drop")
   
   
@@ -174,7 +181,7 @@ sbsFun <- function(taxa_cube){
       dplyr::group_by(scientificName,cellCode) %>%
       dplyr::summarise(across(obs, sum), .groups = "drop") %>%
       tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
-      dplyr:: arrange(cellCode) %>% 
+      dplyr::arrange(cellCode) %>% 
       tibble::column_to_rownames(var = "cellCode") %>% 
       as.matrix()
     
@@ -189,15 +196,15 @@ sbsFun <- function(taxa_cube){
 
 
 #specie by environment
-sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,siteID){
+sbeFun <- function(rastfile,country.sf,res=0.25,siteID){
 
   # read the rastfile if path is given
   if("character" %in% class(rastfile)){
     # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
-    env = geodata::worldclim_global(var='bio',
+    env <- geodata::worldclim_global(var='bio',
                                         res=2.5, path=rastfile,
                                         version="2.1")
-    names(env) = c('AnnTemp','DiurRange','Isotherm','TempSeas',
+    names(env) <- c('AnnTemp','DiurRange','Isotherm','TempSeas',
                    
                    'MaxTemp','MinTemp','TempRange',
                        
@@ -213,27 +220,41 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,siteID){
   }
 
   # Crop environmental variables to extent of of the country's boundary
-  env = crop(env, ext(country.sf))
+  env <- terra::crop(env, ext(country.sf))
   # Convert the cropped raster to points, removing NA values
   env_points <- as.data.frame(env, xy = TRUE, na.rm = TRUE)
   
   # Define grid cell for sites and environmental variables
-  gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
-  envQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326")
+  gridQDS <- terra::rast(country.sf,res=c(res,res), crs="EPSG:4326")
+  envQDS <- terra::rast(country.sf,res=c(res,res), crs="EPSG:4326")
   # create raster for environmental data
   for (v in names(env_points[,-c(1,2)])) {
     idw_model <- gstat::gstat(id = v ,formula = as.formula(paste(v,"~1")), data = env_points,
                               locations = ~x+y,nmax = 7, set = list(idp = 2))
     interpolated_raster <- terra::interpolate(gridQDS, idw_model)
-    envQDS=c(envQDS,interpolated_raster[[1]])
+    envQDS <- c(envQDS,interpolated_raster[[1]])
   }
-  envQDS=mask(envQDS,country.sf)
-  # extract site by environment from the QDS layers
-  sitebyEnv = as.data.frame(envQDS[])
-  # select occurrence sites
-  sitebyEnv<-sitebyEnv[siteID,]
-  # create species by site matrix and drop siteID
-  sbeM <-as.matrix(sitebyEnv)
+  
+  #create grid for region
+  grid <- country.sf %>%
+    sf::st_make_grid(cellsize = c(res,res),
+                     offset = c(sf::st_bbox(country.sf)$xmin,
+                                sf::st_bbox(country.sf)$ymin)) %>%
+    sf::st_sf() %>%
+    dplyr::mutate(cellid = dplyr::row_number())
+  
+  # create site by environment
+  sbeM <- as.data.frame(envQDS, xy = TRUE, na.rm = TRUE) %>% 
+    sf::st_as_sf(coords = c("x", "y"),crs = 4326) %>% 
+    sf::st_join(grid) %>% 
+    dplyr::filter(cellid %in% as.integer(siteID)) %>% 
+    as.data.frame() %>% 
+    dplyr::arrange(cellid) %>% 
+    dplyr::select(-any_of(c("cellid","geometry"))) %>% 
+    as.matrix()
+
+  
+  # collect environmental variable name
   variable.name<-colnames(sbeM)
   colnames(sbeM)<-NULL
   return(list("sbe"=sbeM,"variable.name"=variable.name))
@@ -241,7 +262,7 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,siteID){
 
 
 #species by trait
-sbtFun<-function(tryfile,taxa.sf){
+sbtFun<-function(tryfile,taxa_cube){
   # read the try data if path is given
   if("character" %in% class(tryfile)){
     trydata<-rtry::rtry_import(
@@ -258,7 +279,6 @@ sbtFun<-function(tryfile,taxa.sf){
       cli::cli_abort(c("{missingcol} is/are not in the {.var tryfile} column "))
     }
     
-    
     trydata<-tryfile
   } else { # stop and report if tryfile is not a file path or dataframe
     cli::cli_abort(c("{.var tryfile} is not a file path or dataframe"))
@@ -266,7 +286,7 @@ sbtFun<-function(tryfile,taxa.sf){
 
  
   # extract unique species name from GBIF occurrence data
-  uN<-sort(unique(taxa.sf$taxa$species))
+  species_list <- sort(unique(taxa_cube$taxa$data$scientificName))
 
   SpeciesbyTrait<-trydata %>%
     # drop rows which contains no trait
@@ -274,35 +294,35 @@ sbtFun<-function(tryfile,taxa.sf){
     # select species name, trait and trait value
     dplyr::select(AccSpeciesName,TraitID,OrigValueStr) %>%
     #group by Species and trait
-    group_by(AccSpeciesName,TraitID) %>%
+    dplyr::group_by(AccSpeciesName,TraitID) %>%
     #choose the first trait value if there are multiples trait for a species
-    summarise(across(OrigValueStr, first), .groups = "drop") %>%
+    dplyr::summarise(across(OrigValueStr, first), .groups = "drop") %>%
     # reshape to wide format to have specie by trait dataframe
-    pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>%
+    tidyr::pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>%
     # select species that are only present in gbif data
-    filter(AccSpeciesName %in% uN) %>%
+    dplyr::filter(AccSpeciesName %in% species_list) %>%
     # convert species names to row names
-    column_to_rownames(var = "AccSpeciesName") %>% 
+    tibble::column_to_rownames(var = "AccSpeciesName") %>% 
     # select traits that contain at least a single value
-    select_if(~ !all(is.na(.)))
+    dplyr::select_if(~ !all(is.na(.)))
   # add the rows of the remaining species without traits from TRY
-  na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(uN,rownames(SpeciesbyTrait))),
+    na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(species_list,rownames(SpeciesbyTrait))),
                                ncol = ncol(SpeciesbyTrait)))
-    row.names(na.df)<-setdiff(uN,rownames(SpeciesbyTrait))
+    row.names(na.df)<-setdiff(species_list,rownames(SpeciesbyTrait))
     names(na.df)<-names(SpeciesbyTrait) 
     SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
     #collect traitID
     trait<-colnames(SpeciesbyTrait)
     #sort rows according to unique species list
-    SpeciesbyTrait<-as.data.frame(SpeciesbyTrait[uN,])
+    SpeciesbyTrait<-as.data.frame(SpeciesbyTrait[species_list,])
     
     # Download WCVP for native taxa in area of interest
     native_list <- rWCVP::wcvp_checklist() %>%
       filter(area_code_l3 %in% rWCVP::get_wgsrpd3_codes("South Africa")) %>%
-      filter((accepted_name %in% uN) & occurrence_type=="native")
+      filter((accepted_name %in% species_list) & occurrence_type=="native")
 
     # create taxa list
-    taxa_list<-data.frame(taxon=uN)
+    taxa_list<-data.frame(taxon=species_list)
 
     # create new dataframe with introduction status
     taxa_list_status<-taxa_list%>%
@@ -322,27 +342,26 @@ sbtFun<-function(tryfile,taxa.sf){
     #extract the trait names
     traitname<-trydata %>%
       # drop rows which contains no trait
-      drop_na(TraitID) %>%
+      tidyr::drop_na(TraitID) %>%
       # select the trait ID and trait name
       dplyr::select(TraitID,TraitName) %>%
-      group_by(TraitID) %>%
-      summarise(across(TraitName, first), .groups = "drop") %>%
-      column_to_rownames("TraitID")
-    #create trait name to align with the sbt column
-    traitname<-c(traitname[trait,],"Introduction status")
-    traitname<-data.frame('TraitID'=c(trait,"Introduction status"),'TraitName'=traitname)
+      dplyr::group_by(TraitID) %>%
+      dplyr::summarise(across(TraitName, first), .groups = "drop") %>%
+      tibble::column_to_rownames("TraitID")
+      #create trait name to align with the sbt column
+      traitname<-c(traitname[trait,],"Introduction status")
+      traitname<-data.frame('TraitID'=c(trait,"Introduction status"),'TraitName'=traitname)
   return(list("sbt"=sbtM,"traitname"=traitname))
 
 }
 
 dataGEN = function(taxa,country.sf,country='ZA',limit=500,ref=NULL,
                    res=0.25,tryfile,rastfile){
-  taxa.sf <- taxaFun(taxa = taxa,limit = limit,ref = ref, country = country)
-  sbs <- sbsFun(taxa.sf = taxa.sf,country.sf = country.sf,res = res )
-  sbt <- sbtFun(tryfile = tryfile,taxa.sf = taxa.sf)
+  taxa_cube <- taxaFun(taxa=taxa,country.sf=country.sf,limit=limit, ref=ref,country=country,res=res)
+  sbs <- sbsFun(taxa_cube = taxa_cube,country.sf = country.sf, res = res)
+  sbt <- sbtFun(tryfile = tryfile,taxa_cube = taxa_cube)
   siteID <- sbs$siteID
-  sbe <- sbeFun(rastfile = rastfile, taxa.sf=taxa.sf, country.sf = country.sf,
-                res = res,siteID = siteID)
+  sbe <- sbeFun(rastfile=rastfile,country.sf=country.sf,res=res,siteID=siteID)
   return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
 }
 
