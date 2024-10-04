@@ -132,7 +132,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
 }
 
 # Specie by site
-sbsFun <- function(taxa_cube,country.sf,res){
+sbsFun <- function(taxa_cube){
 
   # extract unique species name from GBIF occurrence data
   species_list<-sort(unique(taxa_cube$taxa$data$scientificName))
@@ -147,28 +147,28 @@ sbsFun <- function(taxa_cube,country.sf,res){
     as.matrix()
   
   #create grid for region
-  grid <- country.sf %>%
-    sf::st_make_grid(cellsize = c(res,res),
-                     offset = c(sf::st_bbox(country.sf)$xmin,
-                                sf::st_bbox(country.sf)$ymin)) %>%
-    sf::st_sf() %>%
-    dplyr::mutate(cellid = dplyr::row_number())
-  
-  # get coordinates of the occurrence sites
-  coords <- sf::st_coordinates(sf::st_centroid(grid))
-  coords <- coords[as.integer(rownames(sbsM)),]
-  colnames(coords)<-c("Longitude","Latitude")
+  # grid <- country.sf %>%
+  #   sf::st_make_grid(cellsize = c(res,res),
+  #                    offset = c(sf::st_bbox(country.sf)$xmin,
+  #                               sf::st_bbox(country.sf)$ymin)) %>%
+  #   sf::st_sf() %>%
+  #   dplyr::mutate(cellid = dplyr::row_number())
+  # 
+  # # get coordinates of the occurrence sites
+  # coords <- sf::st_coordinates(sf::st_centroid(grid))
+  # coords <- coords[as.integer(rownames(sbsM)),]
+  # colnames(coords)<-c("Longitude","Latitude")
  
-  colnames(sbsM)<-NULL # remove column names
+  colnames(sbsM)<-NULL #remove column names
   # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
   
   #create site uncertainty
   site_uncertainty <- taxa_cube$taxa$data %>% 
-    dplyr::select(all_of(c("cellCode","minCoordinateUncertaintyInMeters"))) %>% 
+    dplyr::select(all_of(c("cellCode","minCoordUncertaintyInMeters"))) %>% 
     dplyr::group_by(cellCode) %>% 
-    dplyr::summarise(across(minCoordinateUncertaintyInMeters, sum), .groups = "drop")
+    dplyr::summarise(across(minCoordUncertaintyInMeters, sum), .groups = "drop")
   
   
   # compute sbs for ref if it is different from taxa
@@ -190,7 +190,8 @@ sbsFun <- function(taxa_cube,country.sf,res){
 
 
   return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
-              "coords"=coords,"species_list"=species_list,
+              #"coords"=coords,
+              "species_list"=species_list,
               "siteID"=rownames(sbsM),"site_unc"=site_uncertainty))
 }
 
