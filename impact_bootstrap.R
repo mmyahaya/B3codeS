@@ -17,10 +17,11 @@ sbs.fun<-function(y){
 
 my_boot_statistic <- function(data, indices, fun) {
   d <- data[indices]
-  return(fun(d))
+  y<-indices
+  return(fun(d,y))
 }
 
-my_fun<-function(x){
+my_fun<-function(x,y){
   
   species_list<-colnames(x)
 
@@ -31,10 +32,10 @@ my_fun<-function(x){
                                     region = "South Africa")
   }
   
-  
+
 
   intro.sf<-taxon_cube$data %>%
-    filter(year==2000) %>%
+    filter(year==period[-c(1:12)][y]) %>%
     left_join(taxa_list_status,
               by = c("scientificName" = "taxon"))
 
@@ -63,12 +64,10 @@ my_fun<-function(x){
   impact<-sum(impactScore,na.rm = TRUE) 
   
   
-  # 
-  # if (is.nan(m)) {
-  #   m <- NA
-  # }
    return(indices)
 }
+
+
 
 #sbs.taxon_list<-map(period[-c(1:12)],sbs.fun)
 

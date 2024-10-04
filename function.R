@@ -9,7 +9,6 @@ library(rasterVis)
 library(rWCVP)
 library(rWCVPdata)
 
-
 taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
   
   grid <- country.sf %>%
@@ -129,104 +128,63 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
     ref_cube <- taxa_cube
   }
   
-  
-  
   return(list("taxa"=taxa_cube,"ref"=ref_cube))
 }
 
 # Specie by site
-sbsFun <- function(taxa.sf,country.sf,res=0.25){
+sbsFun <- function(taxa_cube){
   # extract unique species name from GBIF occurrence data
-  uN<-sort(unique(taxa.sf$taxa$species))
-  # Create grid cells with extent of country shapefile and layers for siteID and species
-  gridQDS = rast(country.sf,res=c(res,res), crs="EPSG:4326",nlyrs=length(uN)+1)
-  # specify name for each layers for site ID and species
-  names(gridQDS)<-c("siteID",uN)
-  # Assign ID for each cell
-  gridQDS[["siteID"]]<-1:ncell(gridQDS)
-  # create layer for species occurrence in each cell
-  for(n in uN){
-    # create raster of species
-    speciesQDS = terra::rasterize(dplyr::filter(taxa.sf$taxa, species==n),
-                           gridQDS,
-                           field=1,
-                           fun="sum",
-                           background = 0)
-    # insert occurrence layer for each species to it assigned layer
-    gridQDS[[n]] <- speciesQDS[]
-  }
- # mask grid cells to country shape file
-  gridQDS = mask(gridQDS, country.sf)
+  species_list<-sort(unique(taxa_cube$taxa$data$scientificName))
+  
+  sbsM<-taxa_cube$taxa$data %>%
+    dplyr::select(scientificName,cellCode,obs) %>%
+    dplyr::group_by(scientificName,cellCode) %>%
+    dplyr::summarise(across(obs, sum), .groups = "drop") %>%
+    tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
+    dplyr:: arrange(cellCode) %>% 
+    tibble::column_to_rownames(var = "cellCode") %>% 
+    as.matrix()
 
-  # create data frame of site by species
-  sbs <- as.data.frame(gridQDS)
-  # select sites which have occurrences
-  sbs<-sbs[rowSums(sbs[,-1])!=0,]
-  # collect site ID
-  siteID<-sbs$siteID
-  # collect grid for plot
-  taxaQDS=gridQDS
+  
   
   # get coordinates of the occurrence sites
-  coords <- terra::xyFromCell(gridQDS, sbs$siteID)
+  coords <- sf::st_coordinates(sf::st_centroid(grid))
+  coords <- coords[as.integer(rownames(sbsM)),]
   colnames(coords)<-c("Longitude","Latitude")
-  sbsM<-as.matrix(sbs[,-1]) # remove siteID and convert to matrix
+ 
   colnames(sbsM)<-NULL # remove column names
   # create binary matrix
   sbsM.binary<-sbsM
   sbsM.binary[sbsM.binary>0]<-1
   
   #create site uncertainty
-  site_uncertainty = terra::rasterize(taxa.sf$taxa,
-                                      gridQDS,
-                                      field="coordinateUncertaintyInMeters",
-                                      fun=mean,
-                                      background = 0)
+  site_uncertainty <- taxa_cube$taxa$data %>% 
+    select(all_of(c("cellCode","minCoordinateUncertaintyInMeters"))) %>% 
+    group_by(cellCode) %>% 
+    dplyr::summarise(across(minCoordinateUncertaintyInMeters, sum), .groups = "drop")
   
-  site_uncertainty = as.data.frame(site_uncertainty)
-  site_uncertainty = site_uncertainty[siteID,]
   
   # compute sbs for ref if it is different from taxa
-  if(identical(taxa.sf$taxa,taxa.sf$ref)){
+  if(identical(taxa_cube$taxa,taxa_cube$ref)){
     sbsM.ref<-sbsM
   } else{
-    # extract unique species name from GBIF occurrence data
-    uN.ref<-sort(unique(taxa.sf$ref$species))
-    # Create grid cells with extent of country shapefile and layers for siteID and species
-    gridQDS = terra::rast(country.sf,res=c(res,res), crs="EPSG:4326",
-                   nlyrs=length(uN.ref)+1)
-    # specify name for each layers of site ID and individual species
-    names(gridQDS)<-c("siteID",uN.ref)
-    # Assign ID for each cell
-    gridQDS[["siteID"]]<-1:ncell(gridQDS)
-    # create layer for species occurrence in each cell
-    for(n in uN.ref){
-      # create raster of species
-      speciesQDS = rasterize(dplyr::filter(taxa.sf$ref, species==n),
-                             gridQDS,
-                             field=1,
-                             fun="sum",
-                             background = 0)
-      # insert occurrence layer for each species to it assigned layer
-      gridQDS[[n]] <- speciesQDS[]
-    }
-    # mask grid cells to country shape file
-    gridQDS = mask(gridQDS, country.sf)
-
-    # create data frame of site by species
-    sbs.ref <- as.data.frame(gridQDS)
-    # select sites base on taxa occurrence site
-    sbs.ref <- sbs.ref[sbs$siteID,]
-   
-
-    sbsM.ref<-as.matrix(sbs.ref[,-1]) # remove siteID and convert to matrix
+    
+    sbsM.ref<-taxa_cube$ref$data %>%
+      dplyr::select(scientificName,cellCode,obs) %>%
+      dplyr::group_by(scientificName,cellCode) %>%
+      dplyr::summarise(across(obs, sum), .groups = "drop") %>%
+      tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
+      dplyr:: arrange(cellCode) %>% 
+      tibble::column_to_rownames(var = "cellCode") %>% 
+      as.matrix()
+    
     colnames(sbsM.ref)<-NULL # remove column names
   }
 
 
   return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
-              "coords"=coords,"species.name"=uN,
-              "siteID"=sbs$siteID, "taxaQDS"=taxaQDS[[-1]],"site_unc"=site_uncertainty))
+              "coords"=coords,"species_list"=species_list,
+              "siteID"=rownames(sbsM),"site_unc"=site_uncertainty))
 }
 
 
@@ -266,7 +224,7 @@ sbeFun<- function(rastfile,taxa.sf,country.sf,res=0.25,siteID){
   for (v in names(env_points[,-c(1,2)])) {
     idw_model <- gstat::gstat(id = v ,formula = as.formula(paste(v,"~1")), data = env_points,
                               locations = ~x+y,nmax = 7, set = list(idp = 2))
-    interpolated_raster <- interpolate(gridQDS, idw_model)
+    interpolated_raster <- terra::interpolate(gridQDS, idw_model)
     envQDS=c(envQDS,interpolated_raster[[1]])
   }
   envQDS=mask(envQDS,country.sf)
