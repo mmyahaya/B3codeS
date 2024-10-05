@@ -13,20 +13,20 @@ library(rasterVis)
 ##### gbif data ####
 taxa = 'Fabaceae' # scientific name
 #Tracheophyta Fabaceae
-gbif_download = occ_data(scientificName=c("Acacia","Vachellia"), # download data from gbif
+gbif_download = occ_data(scientificName=taxa, # download data from gbif
                          country='ZA',
                          hasCoordinate=TRUE,
                          hasGeospatialIssue=FALSE,
-                         limit = 2000)
+                         limit = 70000)
 
-taxa.df1 = as.data.frame(gbif_download[["Acacia"]]$data) %>%  dplyr::select(decimalLatitude,decimalLongitude,
-                                                                   species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
-taxa.df2 = as.data.frame(gbif_download[["Vachellia"]]$data) |> dplyr::select(decimalLatitude,decimalLongitude,
-                                                                     species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
+#taxa.df1 = as.data.frame(gbif_download[["Acacia"]]$data) %>%  dplyr::select(decimalLatitude,decimalLongitude,
+  #                                                                 species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
+#taxa.df2 = as.data.frame(gbif_download[["Vachellia"]]$data) |> dplyr::select(decimalLatitude,decimalLongitude,
+    #                                                                 species,coordinateUncertaintyInMeters,dateIdentified,year,month,day)
 #extract data from the downloaded file
 
-taxa.df=rbind(taxa.df1,taxa.df2)
-taxa.occ = taxa.df %>%
+#taxa.df=rbind(taxa.df1,taxa.df2)
+taxa.occ =gbif_download$data %>%
   dplyr::select(decimalLatitude,decimalLongitude,#"coordinateUncertaintyInMeters"
                 species,coordinateUncertaintyInMeters,dateIdentified,year,month,day) %>% #select occurrence data
   filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
@@ -426,9 +426,10 @@ impact_M = eicat_data %>%
 data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)])
 
 
-intro.sf<-taxa.sf$taxa %>% 
-  left_join(data.frame("name"=specie_list, "introduction_status"=sbt$sbt[,ncol(sbt$sbt)]),
-            by = c("species" = "name"))
+intro.sf<-taxon_cube$data %>% 
+  left_join(taxa_list_status,
+            by = c("scientificName" = "taxon")) %>% 
+  as.data.frame()
 
 
 
@@ -468,3 +469,16 @@ uncertaintyDS <- rasterize(intro.sf,
                         gridQDS, field = "coordinateUncertaintyInMeters", fun = mean, background = NA)
 plot(uncertaintyDS)
 
+
+
+
+northEU<-st_read("C:/Users/mukht/Downloads/world-administrative-boundaries/world-administrative-boundaries.shp")
+ZAsf<-filter(northEU,name=="South Africa") %>% select(name,geometry)
+plot(ZAsf)
+
+
+# Save the sf object to a .rds file
+saveRDS(northEU, file = "C:/Users/mukht/Documents/B3codeS/countries_shapefile.rds")
+countries_sf<-readRDS("C:/Users/mukht/Documents/B3codeS/countries_shapefile.rds")
+SA.sf<-filter(countries_sf,name=="South Africa") %>% select(name,geometry)
+plot(SA.sf)
