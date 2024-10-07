@@ -18,9 +18,23 @@
 #'of the reference taxa while the dataframe is the GBIF occurrences data which 
 #'must contain "decimalLatitude","decimalLongitude","species","speciesKey",
 #'"coordinateUncertaintyInMeters","dateIdentified", and "year".
-#'@param country Character. Country for which the GBIP occurrences data should 
-#'be downloaded
-#'@param res Numeric. The resolution of grid cells to be used. Default is 0.25
+#' @param country Character. Country for which the GBIP occurrences data should 
+#' be downloaded. Country should be 2-letter country code (ISO-3166-1).
+#' Default is ZA
+#' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
+#'
+#' @return A list containing the `sim_cubes` of focal and reference taxa.
+#' 
+#' @examples
+#' \dontrun{
+#' countries_sf<-readRDS(paste0(getwd(),"/countries_shapefile.rds"))
+#' SA.sf<-filter(countries_sf,name=="South Africa") %>% select(name,geometry)
+#' taxa_Fabacae <- readr::read_delim(paste0(getwd(),"/taxa_Fabacae.csv"), 
+#'                            delim = "\t", escape_double = FALSE, 
+#'                           trim_ws = TRUE)
+#' taxa_cube <- taxaFun(taxa=taxa_Fabacae, country.sf=SA.sf)
+#' }
+#' 
 
 
 taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
