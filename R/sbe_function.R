@@ -3,6 +3,9 @@
 #' @description Create site-by-environment (sbe) matrix over the given region.
 #' The rows and columns of the matrix represents the sites and environmental
 #' variables respectively. 
+#' @param rastfile Raster. should be path for storing the worldclim data 
+#' (see geodata::worldclim_global) or any other raster data of environmental 
+#' variable
 #' @param country.sf sf object. The shapefile of the region of study
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
 #' @param siteID Vector. The cellids of site with occurrences. An output of `sbs`

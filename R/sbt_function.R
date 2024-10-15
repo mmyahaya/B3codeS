@@ -1,3 +1,12 @@
+#' @title Create species-by-trait matrix
+#' 
+#' @description Create species-by-trait (sbt) matrix for the given species.
+#' The rows and columns of the matrix represents the species and trait
+#' variables respectively. 
+#' @param tryfile Character. File path of the *.txt of the TRY 'released' data or 
+#' dataframe imported by rtry::rtry_import()
+#' @param taxa_cube List. A list containing `sim_cubes`of the focal and reference
+#' taxa.
 sbtFun<-function(tryfile,taxa_cube){
   # read the try data if path is given
   if("character" %in% class(tryfile)){
