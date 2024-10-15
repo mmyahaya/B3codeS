@@ -9,7 +9,7 @@
 
 sbeFun <- function(rastfile,country.sf,res=0.25,siteID){
   
-  # read the rastfile if path is given
+  # read the rast data if path is given
   if("character" %in% class(rastfile)){
     # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
     env <- geodata::worldclim_global(var='bio',
