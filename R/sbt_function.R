@@ -7,6 +7,12 @@
 #' dataframe imported by rtry::rtry_import()
 #' @param taxa_cube List. A list containing `sim_cubes`of the focal and reference
 #' taxa.
+#' #' @examples
+#' \dontrun{
+#' try_path<-"C:/Users/mukht/Documents/B3codeS/TRY_Vascular.txt"
+#' taxa_cube <- taxaFun(taxa=taxa_Fabacae, country.sf=SA.sf)
+#' sbt <- sbtFun(tryfile=try_path, taxa_cube=taxa_cube)
+#' }
 sbtFun<-function(tryfile,taxa_cube){
   # read the try data if path is given
   if("character" %in% class(tryfile)){

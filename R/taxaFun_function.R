@@ -1,7 +1,7 @@
 #' @title Prepare Data Cubes
 #'
 #'@description Prepare data cube to calculate Species-by-site (sbs), 
-#' Species-by-trait (sbt), and Site-by-environment (sbe). The function 'taxaFun'
+#' Species-by-trait (sbt), and Site-by-environment (sbe). The function `taxaFun`
 #' can take in the scientific name of the taxa of interest as in character or 
 #' GBIF occurrences data containing necessary columns. The GBIF occurrences is 
 #' downloaded if scientific names is given. The function returns data cubes of 

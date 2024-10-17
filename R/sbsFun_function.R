@@ -93,3 +93,4 @@ sbsFun <- function(taxa_cube,country.sf,res=0.25,col_temporal=NULL){
               "coords"=coords,"species_list"=species_list,
               "siteID"=rownames(sbsM),"site_unc"=site_uncertainty,"sbsbt"=sbsbtM))
 }
+
