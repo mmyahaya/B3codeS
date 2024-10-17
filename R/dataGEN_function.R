@@ -26,12 +26,14 @@ dataGEN = function(taxa,
                   appendix = appendix)
     
     sbt <- sbtFun(tryfile = tryfile,
-                  taxa_cube = taxa_cube)
+                  taxa_cube = taxa_cube,
+                  appendix=appendix)
     
     siteID <- sbs$siteID
     sbe <- sbeFun(rastfile=rastfile,
                   country.sf=country.sf,
-                  res=res,siteID=siteID)
+                  res=res,siteID=siteID,
+                  appendix=appendix)
     
     return(list("sbs"=sbs,"sbt"=sbt,"sbe"=sbe))
   } else if(option==2){
@@ -63,7 +65,7 @@ dataGEN = function(taxa,
 
 datalist <- dataGEN(taxa=taxa_Fabacae,
                    country.sf=SA.sf,
-                   option=2,
+                   option=1,
                    limit=500,
                    ref=NULL,
                    res=0.25,

@@ -10,12 +10,15 @@
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
 #' @param siteID Vector. The cellids of site with occurrences. An output of `sbs`
 #' 
-#' rastpath <- "C:/Users/mukht/Documents"
+#' rast_path <- "C:/Users/mukht/Documents"
 #' siteID <- sbs$siteID
 
 
-sbeFun <- function(rastfile,country.sf,res=0.25,siteID){
-  
+sbeFun <- function(rastfile,
+                   country.sf,
+                   res=0.25,
+                   siteID,
+                   appendix=FALSE){
   # read the rast data if path is given
   if("character" %in% class(rastfile)){
     # Download the WorldClim Bioclimatic variables for the world at a 10 arc-minute resolution
@@ -74,6 +77,10 @@ sbeFun <- function(rastfile,country.sf,res=0.25,siteID){
   
   # collect environmental variable name
   variable.name<-colnames(sbeM)
-  colnames(sbeM)<-NULL
-  return(list("sbe"=sbeM,"variable.name"=variable.name))
+  
+  if(appendix){
+    return(list("sbe"=sbeM,"variable.name"=variable.name))
+  } else {return(list("sbe"=sbeM))}
+  
+  
 }
