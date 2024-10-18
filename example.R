@@ -25,11 +25,11 @@
 #rsa_country_sf<- st_read()
 
 
-rsa_country_sf = st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
+rsa_country_sf = sf::st_read("C:/Users/mukht/Documents/boundary_SA/boundary_south_africa_land_geo.shp")
 
 
-datalist<-dataGEN(taxa=taxa_Acacia,country.sf=rsa_country_sf,
-                  tryfile="TRY_Acacia.txt",rastfile=rastpath)
+datalist<-dataGEN(taxa=taxa_Fabacae,country.sf=SA.sf,
+                  tryfile=try_path,rastfile=rastpath,limit = 1000)
 
 datalist2<-dataGEN(taxa="Vachellia",country.sf=rsa_country_sf,
                   tryfile="TRY_All.txt",rastfile=rastpath,limit = 2000)
@@ -39,7 +39,7 @@ datalist2<-dataGEN(taxa="Vachellia",country.sf=rsa_country_sf,
 # datalist[["sbs"]]$sbs  : site by species
 # datalist[["sbt"]]$traitname ; Name of trait
 
-taxa.sf<-taxaFun(taxa=Acacia_Vachellia)
-sbs <- sbsFun(taxa.sf,rsa_country_sf)
-sbt<-sbtFun("TRY_Acacia.txt",taxa.sf)
-sbe<-sbeFun(path,taxa.sf,rsa_country_sf,siteID = sbs$siteID)
+taxa.sf<-taxaFun(taxa=taxa_Fabacae,country.sf = rsa_country_sf, ref = taxa_Acacia)
+sbs <- sbsFun(taxa_cube = A)
+sbt<-sbtFun(tryfile =  "TRY_Acacia.txt",taxa_cube = taxa_cube)
+sbe<-sbeFun(rastfile =  precdata,country.sf =  rsa_country_sf,siteID = sbs$siteID)

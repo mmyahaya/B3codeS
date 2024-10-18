@@ -3,15 +3,16 @@
 
 # Make a grid across the map area
 grid <- rsa_country_sf %>%
-  sf::st_make_grid(cellsize = c(cell_size, cell_size),
+  sf::st_make_grid(cellsize = c(res,res),
                    offset = c(sf::st_bbox(rsa_country_sf)$xmin,
                               sf::st_bbox(rsa_country_sf)$ymin)) %>%
   sf::st_sf() %>%
   dplyr::mutate(cellid = dplyr::row_number())
 
-taxon.sf = taxa_Fabacae %>%
+taxon.sf = taxa_Acacia %>%
   dplyr::select(decimalLatitude,decimalLongitude,
-                species,coordinateUncertaintyInMeters,year,speciesKey) %>% #select occurrence data
+                species,iucnRedListCategory,coordinateUncertaintyInMeters,year,speciesKey,
+                iucnRedListCategory) %>% #select occurrence data
   dplyr::filter_all(all_vars(!is.na(.))) %>% # remove rows with missing data
   dplyr::filter(coordinateUncertaintyInMeters<=res*1000) %>% 
   sf::st_as_sf(coords = c("decimalLongitude", "decimalLatitude"),
@@ -19,33 +20,36 @@ taxon.sf = taxa_Fabacae %>%
   st_join(grid) %>% 
   as.data.frame() %>% 
   dplyr::select(-geometry) %>% 
-  dplyr::mutate(occurrenceStatus=1)
+  dplyr::mutate(occurrences=1) %>% 
+  group_by(species,coordinateUncertaintyInMeters,year,speciesKey,
+           iucnRedListCategory,cellid) %>% 
+  summarise(across(occurrences, sum), .groups = "drop")
 
 
 
-taxon_cube<-b3gbi::process_cube(taxon_sf,grid_type = "custom",cols_cellCode = "cellid", cols_year = "year",
-                 cols_occurrences = "occurrenceStatus",cols_species = "species",cols_speciesKey = "speciesKey",
+taxon_cube<-b3gbi::process_cube(taxon.sf,grid_type = "custom",cols_cellCode = "cellid", cols_year = "year",
+                 cols_occurrences = "occurrences",cols_species = "species",cols_speciesKey = "speciesKey",
                  cols_minCoordinateUncertaintyInMeters = "coordinateUncertaintyInMeters")
 
 
 
-ts_obs_rich <- obs_richness_ts(taxon_cube, first_year=1990)
-plot(ts_obs_rich)
-list_species(taxon_cube)
-ts_turnover<-occ_turnover_ts(taxon_cube)
+# ts_obs_rich <- obs_richness_ts(taxon_cube, first_year=1990)
+# plot(ts_obs_rich)
+# list_species(taxon_cube)
+# ts_turnover<-occ_turnover_ts(taxon_cube)
+# 
+# plot(ts_turnover)
+# #ts_density<-occ_density_ts(taxon_cube)
+# plot(ts_density)
+# 
+# ts_evenness<-pielou_evenness_ts(taxon_cube)
+# 
+# plot(ts_evenness)
+# 
+# period<-sort(unique(taxon_cube$data$year))
 
-plot(ts_turnover)
-#ts_density<-occ_density_ts(taxon_cube)
-plot(ts_density)
-
-ts_evenness<-pielou_evenness_ts(taxon_cube)
-
-plot(ts_evenness)
-
-period<-sort(unique(taxon_cube$data$year))
-
-sbs.taxon_list<-list()
-names(sbs.taxon_list)<-paste0("year","_",period[-c(1:12)])
+#sbs.taxon_list<-list()
+#names(sbs.taxon_list)<-paste0("year","_",period[-c(1:12)])
 
 sbs.fun<-function(y){
   sbs.taxon<-taxon_cube$data %>%
@@ -58,41 +62,41 @@ sbs.fun<-function(y){
     column_to_rownames(var = "cellCode") 
   return(sbs.taxon)
 }
-
+full_species_list<-sort(unique(taxon_cube$data$scientificName))
 sbs.taxon_list<-map(period[-c(1:12)],sbs.fun)
 for(y in period[-c(1:12)]){
   
   
   sbs.taxon_list[[paste0("year","_",y)]]<-sbs.taxon
-  # 
-  # species_list<-unique(names(sbs.taxon))
-  # 
-  # if(!exists("taxon_status_list")){
-  #   full_species_list<-sort(unique(taxon_cube$data$scientificName))
-  #   taxon_status_list<-taxon_status(species_list = full_species_list,
-  #                                   source = "WCVP",
-  #                                   region = "South Africa")
-  # }
-  # 
-  # intro.sf<-taxon_cube$data %>% 
-  #   filter(year==y) %>% 
-  #   left_join(taxa_list_status,
-  #             by = c("scientificName" = "taxon"))
-  # 
-  # 
-  # status.sf <- intro.sf %>%
-  #   group_by(cellCode) %>%
-  #   summarise(
-  #     total_intro_obs = sum(obs[introduction_status == "introduced"], na.rm = TRUE),
-  #     total_native_obs = sum(obs[introduction_status == "native"], na.rm = TRUE),
-  #     .groups = "drop"
-  #   ) %>% 
-  #   mutate(across(c(total_intro_obs, total_native_obs), ~ ifelse(.==0,NA,.))) %>% 
-  #   mutate(intro_native=total_intro_obs/total_native_obs) %>% 
-  #   arrange(cellCode)
-  # if (!exists("eicat_score_list")){
-  #   eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = species_list,
-  #                                 fun="max")
+
+  species_list<-unique(names(sbs.taxon))
+
+  if(!exists("taxon_status_list")){
+    full_species_list<-sort(unique(taxon_cube$data$scientificName))
+    taxon_status_list<-taxon_status(species_list = full_species_list,
+                                    source = "WCVP",
+                                    region = "South Africa")
+  }
+
+  intro.sf<-taxon_cube$data %>%
+    filter(year==y) %>%
+    left_join(taxa_list_status,
+              by = c("scientificName" = "taxon"))
+
+
+  status.sf <- intro.sf %>%
+    group_by(cellCode) %>%
+    summarise(
+      total_intro_obs = sum(obs[introduction_status == "introduced"], na.rm = TRUE),
+      total_native_obs = sum(obs[introduction_status == "native"], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(across(c(total_intro_obs, total_native_obs), ~ ifelse(.==0,NA,.))) %>%
+    mutate(intro_native=total_intro_obs/total_native_obs) %>%
+    arrange(cellCode)
+  if (!exists("eicat_score_list")){
+    eicat_score_list=eicat_impact(eicat_data = eicat_data,species_list = species_list,
+                                  fun="max")
   }
  
   eicat_score<-eicat_score_list[species_list,]
@@ -102,19 +106,13 @@ for(y in period[-c(1:12)]){
   impact_metrics<-list(year=y,sbs.taxon=sbs.taxon,eicat_score=eicat_score,siteScore)
   impact_list[[as.character(y)]]<-impact_metrics
 }
-sbs.taxon<-taxon_cube$data %>%
-  filter(year==y) %>% 
-  dplyr::select(scientificName,cellCode,obs) %>%
-  group_by(scientificName,cellCode) %>%
-  summarise(across(obs, sum), .groups = "drop") %>%
-  pivot_wider(names_from = scientificName, values_from = obs) %>%
-  arrange(cellCode) %>% 
-  column_to_rownames(var = "cellCode") 
+
+
 
 
 species_list<-unique(names(sbs.taxon))
 
-full_species_list<-sort(unique(taxon_cube$data$scientificName))
+
 taxon_status_list<-taxon_status(species_list = full_species_list,
                                 source = "WCVP",
                                 region = "South Africa")

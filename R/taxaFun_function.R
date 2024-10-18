@@ -24,7 +24,9 @@
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
 #'
 #' @return A list containing the `sim_cubes` of focal and reference taxa.
-#' 
+#'
+#'@import dplyr
+#'
 #' @examples
 #' \dontrun{
 #' countries_sf<-readRDS(paste0(getwd(),"/countries_shapefile.rds"))

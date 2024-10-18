@@ -147,7 +147,7 @@ input_path<-"TRY_Vascular.txt"
 #"C:/Users/mukht/Downloads/33576.txt"
 #"C:/Users/26485613/OneDrive - Stellenbosch University/Documents/Practice space/33576.txt"
 
-try33852<-rtry_import(
+try_Vascular<-rtry::rtry_import(
   input=input_path,
   separator = "\t",
   encoding = "Latin-1",
@@ -156,11 +156,11 @@ try33852<-rtry_import(
 )
 
 
-SpeciesbyTrait<-try33852 %>%
+SpeciesbyTrait<-try_Vascular %>%
   # drop rows which contains no trait
   drop_na(TraitID) %>%
   # select species name, trait and trait value
-  select(AccSpeciesName,TraitID,OrigValueStr) %>%
+  select(AccSpeciesName,TraitID,TraitName,OrigValueStr,Comment) %>%
   #group by Species and trait
   group_by(AccSpeciesName,TraitID) %>%
   #choose the first trait value if there are multiples trait for a species
@@ -168,23 +168,24 @@ SpeciesbyTrait<-try33852 %>%
   # reshape to wide format to have specie by trait dataframe
   pivot_wider(names_from = TraitID, values_from = OrigValueStr) %>% 
   # select species that are only present in gbif data
-  filter(AccSpeciesName %in% specie_list) %>% 
+  filter(AccSpeciesName %in% species_list) %>% 
   # convert species names to row names
   column_to_rownames(var = "AccSpeciesName") 
 # add the rows of the remaining species without traits from TRY
-{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(specie_list,rownames(SpeciesbyTrait))),
+{na.df<-as.data.frame(matrix(NA,nrow = length(setdiff(species_list,rownames(SpeciesbyTrait))),
                              ncol = ncol(SpeciesbyTrait)))
-  row.names(na.df)<-setdiff(specie_list,rownames(SpeciesbyTrait))
+  row.names(na.df)<-setdiff(species_list,rownames(SpeciesbyTrait))
   names(na.df)<-names(SpeciesbyTrait) # column names
   SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
-  SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]
-  sbtM<-as.matrix(SpeciesbyTrait)
+  SpeciesbyTrait<-SpeciesbyTrait[order(rownames(SpeciesbyTrait)),]}
+
+  {sbtM<-as.matrix(SpeciesbyTrait)
   rownames(sbtM)<-NULL
   colnames(sbtM)<-NULL}
 
 
 
-traitname<-try33852 %>%
+traitname<-try_all %>%
   # drop rows which contains no trait
   drop_na(TraitID) %>%
   # select species name, trait and trait value
