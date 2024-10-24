@@ -5,17 +5,17 @@
 #' respectively. 
 #' @param taxa_cube List. A list containing `sim_cubes`of the focal and reference
 #' taxa.
-#' @param country.sf sf object. The shapefile of the region of study
+#' @param region.sf sf object. The shapefile of the region of study
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
 #' @param col_temporal Character. The name of the column containing the temporal
 #' dimension, e.g., "year". Default is NULL
 #'
 #' 
 #' 
-#' sbs<-sbsFun(taxa_cube,SA.sf,appendix=TRUE)
+#' sbs<-sbsFun(taxa_cube,KZN,appendix=TRUE)
 
 sbsFun <- function(taxa_cube,
-                   country.sf,
+                   region.sf,
                    res=0.25,
                    col_temporal=NULL,
                    appendix=FALSE){
@@ -32,7 +32,7 @@ sbsFun <- function(taxa_cube,
       tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
       dplyr::arrange(cellCode) %>% 
       tibble::column_to_rownames(var = "cellCode") %>% 
-      as.matrix()
+      mutate_all(~ replace(., is.na(.), 0))
     
     #create species-by-site-by-time (sbsbt) if col_temporal is provided
     sbsbtM<-NULL
@@ -54,10 +54,10 @@ sbsFun <- function(taxa_cube,
     }
     
     #create grid for region
-    grid <- country.sf %>%
+    grid <- region.sf %>%
       sf::st_make_grid(cellsize = c(res,res),
-                       offset = c(sf::st_bbox(country.sf)$xmin,
-                                  sf::st_bbox(country.sf)$ymin)) %>%
+                       offset = c(sf::st_bbox(region.sf)$xmin,
+                                  sf::st_bbox(region.sf)$ymin)) %>%
       sf::st_sf() %>%
       dplyr::mutate(cellid = dplyr::row_number())
     
@@ -66,10 +66,11 @@ sbsFun <- function(taxa_cube,
     coords <- coords[as.integer(rownames(sbsM)),]
     colnames(coords)<-c("Longitude","Latitude")
     
-    colnames(sbsM)<-NULL # remove column names
+  
     # create binary matrix
-    sbsM.binary<-sbsM
-    sbsM.binary[sbsM.binary>0]<-1
+    sbsM.binary<-sbsM %>% 
+      mutate(across(everything(), ~ ifelse(. >= 1, 1, .)))
+    
     
     #create site uncertainty
     site_uncertainty <- taxa_cube$taxa$data %>% 
@@ -90,7 +91,7 @@ sbsFun <- function(taxa_cube,
         tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
         dplyr::arrange(cellCode) %>% 
         tibble::column_to_rownames(var = "cellCode") %>% 
-        as.matrix()
+        mutate_all(~ replace(., is.na(.), 0))
       
       colnames(sbsM.ref)<-NULL # remove column names
     }
@@ -110,6 +111,19 @@ sbsFun <- function(taxa_cube,
       tibble::column_to_rownames(var = "cellCode") %>% 
       as.matrix()
     
+    #create grid for region
+    grid <- region.sf %>%
+      sf::st_make_grid(cellsize = c(res,res),
+                       offset = c(sf::st_bbox(region.sf)$xmin,
+                                  sf::st_bbox(region.sf)$ymin)) %>%
+      sf::st_sf() %>%
+      dplyr::mutate(cellid = dplyr::row_number())
+    
+    # get coordinates of the occurrence sites
+    coords <- sf::st_coordinates(sf::st_centroid(grid))
+    coords <- coords[as.integer(rownames(sbsM)),]
+    colnames(coords)<-c("Longitude","Latitude")
+    
     #create species-by-site-by-time (sbsbt) if col_temporal is provided
     sbsbtM<-NULL
     if(!is.null(col_temporal)){
@@ -128,11 +142,10 @@ sbsFun <- function(taxa_cube,
       }
       
     }
-  
-    
+
     return(list("sbs"=sbsM,
-                "siteID"=rownames(sbsM),
-                "sbsbt"=sbsbtM))
+                "coords"=coords,
+                "siteID"=rownames(sbsM)))
   }
   
   

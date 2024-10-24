@@ -6,16 +6,29 @@
 #' @param rastfile Raster. should be path for storing the worldclim data 
 #' (see geodata::worldclim_global) or any other raster data of environmental 
 #' variable
-#' @param country.sf sf object. The shapefile of the region of study
+#' @param region.sf sf object. The shapefile of the region of study
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
 #' @param siteID Vector. The cellids of site with occurrences. An output of `sbs`
 #' 
+#' 
+#' 
+#' #' @examples
+#' \dontrun{
 #' rast_path <- "C:/Users/mukht/Documents"
 #' siteID <- sbs$siteID
+#' sbt <- sbtFun(tryfile=try_path, taxa_cube=taxa_cube)
+#' sbe<-sbeFun(rastfile=rast_path,
+#'                  region.sf=KZN,
+#'                  res=0.25,
+#'                  siteID=siteID,
+#'                  appendix=FALSE)
+#' }
+
+
 
 
 sbeFun <- function(rastfile,
-                   country.sf,
+                   region.sf,
                    res=0.25,
                    siteID,
                    appendix=FALSE){
@@ -41,13 +54,13 @@ sbeFun <- function(rastfile,
   }
   
   # Crop environmental variables to extent of of the country's boundary
-  env <- terra::crop(env, terra::ext(country.sf))
+  env <- terra::crop(env, terra::ext(region.sf))
   # Convert the cropped raster to points, removing NA values
   env_points <- as.data.frame(env, xy = TRUE, na.rm = TRUE)
   
   # Define grid cell for sites and environmental variables
-  gridQDS <- terra::rast(country.sf,res=c(res,res), crs="EPSG:4326")
-  envQDS <- terra::rast(country.sf,res=c(res,res), crs="EPSG:4326")
+  gridQDS <- terra::rast(region.sf,res=c(res,res), crs="EPSG:4326")
+  envQDS <- terra::rast(region.sf,res=c(res,res), crs="EPSG:4326")
   # create raster for environmental data
   for (v in names(env_points[,-c(1,2)])) {
     idw_model <- gstat::gstat(id = v ,formula = as.formula(paste(v,"~1")), data = env_points,
@@ -57,10 +70,10 @@ sbeFun <- function(rastfile,
   }
   
   #create grid for region
-  grid <- country.sf %>%
+  grid <- region.sf %>%
     sf::st_make_grid(cellsize = c(res,res),
-                     offset = c(sf::st_bbox(country.sf)$xmin,
-                                sf::st_bbox(country.sf)$ymin)) %>%
+                     offset = c(sf::st_bbox(region.sf)$xmin,
+                                sf::st_bbox(region.sf)$ymin)) %>%
     sf::st_sf() %>%
     dplyr::mutate(cellid = dplyr::row_number())
   
@@ -71,9 +84,7 @@ sbeFun <- function(rastfile,
     dplyr::filter(cellid %in% as.integer(siteID)) %>% 
     as.data.frame() %>% 
     dplyr::arrange(cellid) %>% 
-    dplyr::select(-any_of(c("cellid","geometry"))) %>% 
-    as.matrix()
-  
+    dplyr::select(-any_of(c("cellid","geometry")))
   
   # collect environmental variable name
   variable.name<-colnames(sbeM)
