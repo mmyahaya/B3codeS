@@ -36,6 +36,10 @@
 #' 
 
 
+
+# install.packages("devtools")
+#devtools::install_github("b-cubed-eu/b3gbi")
+
 taxaFun <- function(taxa,
                     region.sf,
                     limit=500, 
