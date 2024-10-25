@@ -9,8 +9,9 @@
 #' taxa.
 #' #' @examples
 #' \dontrun{
-#' taxa_cube <- taxaFun(taxa=taxa_Fabacae, country.sf=SA.sf)
-#' sbt <- sbtFun(tryfile=try_test, taxa_cube=taxa_cube,appendix=T)
+#' species_trait<-readRDS(paste0(getwd(),"/TRY_traits.rds"))
+#' taxa_cube <- taxaFun(taxa=taxa_Fabacae, region.sf=KZN_sf)
+#' sbt <- sbtFun(tryfile=species_trait, taxa_cube=taxa_cube)
 #' }
 sbtFun<-function(tryfile,
                  taxa_cube,
@@ -65,7 +66,13 @@ sbtFun<-function(tryfile,
                               ncol = ncol(SpeciesbyTrait)))
   row.names(na.df)<-setdiff(species_list,rownames(SpeciesbyTrait))
   names(na.df)<-names(SpeciesbyTrait) 
-  SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df)
+  SpeciesbyTrait<-rbind(SpeciesbyTrait,na.df) %>% 
+    dplyr::mutate_if(is.character, as.numeric) %>% 
+    dplyr::select_if(~ !all(is.na(.))) %>% 
+    dplyr::mutate_all(~ replace(., is.na(.), 0))
+  
+  
+  
   #collect traitID
   trait<-colnames(SpeciesbyTrait)
   #sort rows according to unique species list
@@ -108,6 +115,8 @@ sbtFun<-function(tryfile,
   traitname<-data.frame('TraitID'=paste0("trait_",1:ncol(SpeciesbyTrait)),
                         'TraitName'=traitname)
   
+  names(SpeciesbyTrait)<-paste0("trait_",1:ncol(SpeciesbyTrait))
+  
   if (appendix){
     
     return(list("sbt"=SpeciesbyTrait,"traitname"=traitname))
@@ -115,5 +124,4 @@ sbtFun<-function(tryfile,
     return(list("sbt"=SpeciesbyTrait))
   }
  
-  
 }

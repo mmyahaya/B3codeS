@@ -10,7 +10,7 @@
 #' name of the focal taxa while the dataframe is the GBIF occurrences data which must 
 #' contain "decimalLatitude","decimalLongitude","species","speciesKey",
 #' "coordinateUncertaintyInMeters","dateIdentified", and "year".
-#' @param country.sf sf object. The shapefile of the region of study
+#' @param region.sf sf object. The shapefile of the region of study
 #' @param option Numeric. 1 to compute and return sbs, sbt and sbe. 2 to compute
 #' and return sbs and sbe.
 #' @param limit Integer. Number of records to return from GBIF download.
@@ -19,22 +19,44 @@
 #' of the reference taxa while the dataframe is the GBIF occurrences data which 
 #' must contain "decimalLatitude","decimalLongitude","species","speciesKey",
 #' "coordinateUncertaintyInMeters","dateIdentified", and "year".
+#' @param country Character. Country for which the GBIP occurrences data should 
+#' be downloaded. Country should be 2-letter country code (ISO-3166-1).
+#' Default is ZA
 #' @param res Numeric. The resolution of grid cells to be used. Default is 0.25
-#' #' @param tryfile Character. File path of the *.txt of the TRY 'released' data or 
+#' @param tryfile Character. File path of the *.txt of the TRY 'released' data or 
 #' dataframe imported by rtry::rtry_import()
 #'
 #' @return A list containing the containing sbs, sbt, sbe matrices and their 
 #' appendices if specified.
 #'
+#'#' @examples
+#' \dontrun{
+#' KZN_sf<-readRDS(paste0(getwd(),"/KZN_sf.rds"))
+#' taxa_Fabaceae_KZN <- readRDS(paste0(getwd(),"/Fabaceae_KZN.rds"))
+#' species_trait<-readRDS(paste0(getwd(),"/TRY_traits.rds"))
+#' rast_path <- "C:/Users/mukht/Documents"
+#' datalist <- dataGEN(taxa=taxa_Fabaceae_KZN,
+#'                          region.sf=KZN_sf,
+#'                          option=1,
+#'                          limit=500,
+#'                          ref=NULL,
+#'                          res=0.25,
+#'                          tryfile=species_trait,
+#'                          country='ZA',
+#'                          rastfile=rast_path,
+#'                          appendix=TRUE)
+#' }
+#' 
 
 dataGEN = function(taxa,
-                   country.sf,
+                   region.sf,
                    option,
                    limit=500,
                    ref=NULL,
                    res=0.25,
                    tryfile,
                    country='ZA',
+                   stateProvince=NULL,
                    rastfile,
                    appendix=FALSE){
   
@@ -43,14 +65,15 @@ dataGEN = function(taxa,
   if(option==1){
     
     taxa_cube <- taxaFun(taxa=taxa,
-                         country.sf=country.sf,
+                         region.sf=region.sf,
                          limit=limit, 
                          ref=ref,
                          country=country,
-                         res=res)
+                         res=res,
+                         stateProvince=stateProvince)
     
     sbs <- sbsFun(taxa_cube = taxa_cube,
-                  country.sf = country.sf, 
+                  region.sf = region.sf, 
                   res = res,
                   appendix = appendix)
     
@@ -60,7 +83,7 @@ dataGEN = function(taxa,
     
     siteID <- sbs$siteID
     sbe <- sbeFun(rastfile=rastfile,
-                  country.sf=country.sf,
+                  region.sf=region.sf,
                   res=res,siteID=siteID,
                   appendix=appendix)
     
@@ -68,20 +91,21 @@ dataGEN = function(taxa,
   } else if(option==2){
     
     taxa_cube <- taxaFun(taxa=taxa,
-                         country.sf=country.sf,
+                         region.sf=region.sf,
                          limit=limit, 
                          ref=ref,
                          country=country,
-                         res=res)
+                         res=res,
+                         stateProvince=stateProvince)
     
     sbs <- sbsFun(taxa_cube = taxa_cube,
-                  country.sf = country.sf, 
+                  region.sf = region.sf, 
                   res = res,
                   appendix = appendix)
     
     siteID <- sbs$siteID
     sbe <- sbeFun(rastfile=rastfile,
-                  country.sf=country.sf,
+                  region.sf=region.sf,
                   res=res,
                   siteID=siteID)
     
@@ -92,13 +116,14 @@ dataGEN = function(taxa,
   
 }
 
-datalist <- dataGEN(taxa=taxa_Fabacae,
-                   country.sf=SA.sf,
-                   option=1,
-                   limit=500,
-                   ref=NULL,
-                   res=0.25,
-                   tryfile=try_path,
-                   country='ZA',
-                   rastfile=rast_path,
-                   appendix=TRUE)
+
+datalist <- dataGEN(taxa=taxa_Fabaceae_KZN,
+                         region.sf=KZN_sf,
+                         option=1,
+                         limit=500,
+                         ref=NULL,
+                         res=0.25,
+                         tryfile=species_trait,
+                         country='ZA',
+                         rastfile=rast_path,
+                         appendix=TRUE)

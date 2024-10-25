@@ -11,8 +11,13 @@
 #' dimension, e.g., "year". Default is NULL
 #'
 #' 
-#' 
-#' sbs<-sbsFun(taxa_cube,KZN,appendix=TRUE)
+#' #' @examples
+#' \dontrun{
+#' sbs<-sbsFun(taxa_cube=taxa_cube,
+#'              region.sf=KZN_sf,
+#'              appendix=TRUE)
+#' }
+
 
 sbsFun <- function(taxa_cube,
                    region.sf,
@@ -32,7 +37,7 @@ sbsFun <- function(taxa_cube,
       tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
       dplyr::arrange(cellCode) %>% 
       tibble::column_to_rownames(var = "cellCode") %>% 
-      mutate_all(~ replace(., is.na(.), 0))
+      dplyr::mutate_all(~ replace(., is.na(.), 0))
     
     #create species-by-site-by-time (sbsbt) if col_temporal is provided
     sbsbtM<-NULL
@@ -47,8 +52,7 @@ sbsFun <- function(taxa_cube,
           dplyr::summarise(across(obs, sum), .groups = "drop") %>%
           tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
           dplyr::arrange(cellCode) %>% 
-          tibble::column_to_rownames(var = "cellCode") %>% 
-          as.matrix()
+          tibble::column_to_rownames(var = "cellCode") 
       }
       
     }
@@ -64,12 +68,12 @@ sbsFun <- function(taxa_cube,
     # get coordinates of the occurrence sites
     coords <- sf::st_coordinates(sf::st_centroid(grid))
     coords <- coords[as.integer(rownames(sbsM)),]
-    colnames(coords)<-c("Longitude","Latitude")
+    colnames(coords)<-c("x","y")
     
   
     # create binary matrix
     sbsM.binary<-sbsM %>% 
-      mutate(across(everything(), ~ ifelse(. >= 1, 1, .)))
+      dplyr::mutate(across(everything(), ~ ifelse(. >= 1, 1, .)))
     
     
     #create site uncertainty
@@ -91,9 +95,8 @@ sbsFun <- function(taxa_cube,
         tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
         dplyr::arrange(cellCode) %>% 
         tibble::column_to_rownames(var = "cellCode") %>% 
-        mutate_all(~ replace(., is.na(.), 0))
+        dplyr::mutate_all(~ replace(., is.na(.), 0))
       
-      colnames(sbsM.ref)<-NULL # remove column names
     }
     
     return(list("sbs"=sbsM,"sbs.ref"=sbsM.ref,"sbs.binary"=sbsM.binary,
@@ -109,7 +112,7 @@ sbsFun <- function(taxa_cube,
       tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
       dplyr::arrange(cellCode) %>% 
       tibble::column_to_rownames(var = "cellCode") %>% 
-      as.matrix()
+      dplyr::mutate_all(~ replace(., is.na(.), 0))
     
     #create grid for region
     grid <- region.sf %>%
@@ -122,7 +125,7 @@ sbsFun <- function(taxa_cube,
     # get coordinates of the occurrence sites
     coords <- sf::st_coordinates(sf::st_centroid(grid))
     coords <- coords[as.integer(rownames(sbsM)),]
-    colnames(coords)<-c("Longitude","Latitude")
+    colnames(coords)<-c("x","y")
     
     #create species-by-site-by-time (sbsbt) if col_temporal is provided
     sbsbtM<-NULL
@@ -137,8 +140,7 @@ sbsFun <- function(taxa_cube,
           dplyr::summarise(across(obs, sum), .groups = "drop") %>%
           tidyr::pivot_wider(names_from = scientificName, values_from = obs) %>%
           dplyr::arrange(cellCode) %>% 
-          tibble::column_to_rownames(var = "cellCode") %>% 
-          as.matrix()
+          tibble::column_to_rownames(var = "cellCode")
       }
       
     }

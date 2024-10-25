@@ -15,10 +15,10 @@
 #' #' @examples
 #' \dontrun{
 #' rast_path <- "C:/Users/mukht/Documents"
+#' KZN_sf<-readRDS(paste0(getwd(),"/KZN_sf.rds"))
 #' siteID <- sbs$siteID
-#' sbt <- sbtFun(tryfile=try_path, taxa_cube=taxa_cube)
 #' sbe<-sbeFun(rastfile=rast_path,
-#'                  region.sf=KZN,
+#'                  region.sf=KZN_sf,
 #'                  res=0.25,
 #'                  siteID=siteID,
 #'                  appendix=FALSE)

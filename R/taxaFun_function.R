@@ -11,7 +11,7 @@
 #'name of the focal taxa while the dataframe is the GBIF occurrences data which must 
 #'contain "decimalLatitude","decimalLongitude","species","speciesKey",
 #'"coordinateUncertaintyInMeters","dateIdentified", and "year".
-#'@param country.sf sf object. The shapefile of the region of study
+#'@param region.sf sf object. The shapefile of the region of study
 #'@param limit Integer. Number of records to return from GBIF download.
 #'Default is set to 500
 #'@param ref Character or dataframe.The character should be the scientific name 
@@ -29,22 +29,25 @@
 #'
 #' @examples
 #' \dontrun{
-#' countries_sf<-readRDS(paste0(getwd(),"/countries_shapefile.rds"))
-#' SA.sf<-filter(countries_sf,name=="South Africa") %>% select(name,geometry)
-#' taxa_Fabacae <- readr::read_delim(paste0(getwd(),"/taxa_Fabacae.csv"), 
-#'                            delim = "\t", escape_double = FALSE, 
-#'                           trim_ws = TRUE)
-#' taxa_cube <- taxaFun(taxa=taxa_Fabacae, country.sf=SA.sf)
+#' KZN_sf<-readRDS(paste0(getwd(),"/KZN_sf.rds"))
+#' taxa_Fabaceae_KZN <- readRDS(paste0(getwd(),"/Fabaceae_KZN.rds"))
+#' taxa_cube <- taxaFun(taxa=taxa_Fabaceae_KZN, region.sf=KZN_sf)
 #' }
 #' 
 
 
-taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
+taxaFun <- function(taxa,
+                    region.sf,
+                    limit=500, 
+                    ref=NULL,
+                    country=NULL,
+                    res=0.25,
+                    stateProvince=NULL){
   
-  grid <- country.sf %>%
+  grid <- region.sf %>%
     sf::st_make_grid(cellsize = c(res,res),
-                     offset = c(sf::st_bbox(country.sf)$xmin,
-                                sf::st_bbox(country.sf)$ymin)) %>%
+                     offset = c(sf::st_bbox(region.sf)$xmin,
+                                sf::st_bbox(region.sf)$ymin)) %>%
     sf::st_sf() %>%
     dplyr::mutate(cellid = dplyr::row_number())
   
@@ -52,6 +55,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
   if("character" %in% class(taxa)){
     taxa.gbif_download = rgbif::occ_data(scientificName=taxa, # download data from gbif
                                          country=country,
+                                         stateProvince = stateProvince,
                                          hasCoordinate=TRUE,
                                          hasGeospatialIssue=FALSE,
                                          limit = limit)
@@ -60,7 +64,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
   } else if("data.frame" %in% class(taxa)){ #check if data fame contains the required columns
     if(any(!c("decimalLatitude","decimalLongitude",
               "species","speciesKey","coordinateUncertaintyInMeters","dateIdentified","year") %in% colnames(taxa))){
-      requiredcol<-c("decimalLatitude","decimalLongitude","species","coordinateUncertaintyInMeters","dateIdentified","year")
+      requiredcol<-c("decimalLatitude","decimalLongitude","species","speciesKey","coordinateUncertaintyInMeters","dateIdentified","year")
       missingcol<-requiredcol[!c("decimalLatitude","decimalLongitude","species","speciesKey","coordinateUncertaintyInMeters","dateIdentified","year") %in% colnames(taxa)]
       cli::cli_abort(c("{missingcol} is/are not in the {.var taxa} column ", 
                        "x" = "{.var taxa} should be a data of GBIF format "))
@@ -101,6 +105,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
     if("character" %in% class(ref)){
       ref.gbif_download = rgbif::occ_data(scientificName=ref, # download data from gbif
                                           country=country,
+                                          stateProvince = stateProvince,
                                           hasCoordinate=TRUE,
                                           hasGeospatialIssue=FALSE,
                                           limit = limit)
@@ -172,3 +177,7 @@ taxaFun <- function(taxa,country.sf,limit=500, ref=NULL,country='ZA',res=0.25){
   
   return(list("taxa"=taxa_cube,"ref"=ref_cube))
 }
+
+
+
+
